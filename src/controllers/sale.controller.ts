@@ -1,12 +1,13 @@
-import prisma from '../config/db.js'
+import { Request, Response } from 'express'
+import prisma from '../config/db'
 import {
   createSaleRepo,
   createSaleDetailRepo,
   getInventoryRepo,
   updateInventoryRepo
-} from '../repositories/sale.repository.js'
+} from '../repository/sale.repository'
 
-export const createSale = async (req, res) => {
+export const createSale = async (req: Request, res: Response) => {
   try {
     const { employeeId, locationId, products } = req.body
 
@@ -35,6 +36,12 @@ export const createSale = async (req, res) => {
       const product = await prisma.product.findUnique({
         where: { id: item.productId }
       })
+
+      if (!product) {
+        return res.status(400).json({
+          message: 'product not found'
+        })
+      }
 
       const price = product.finalPrice
 

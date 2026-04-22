@@ -1,11 +1,8 @@
-import {
-  createProductRepo,
-  getProductByBarcodeRepo
-} from '../repositories/product.repository.js'
+import { Request, Response } from 'express'
+import prisma from '../config/db'
+import { createProductRepo } from '../repository/product.repository'
 
-import prisma from '../config/db.js'
-
-export const createProduct = async (req, res) => {
+export const createProduct = async (req: Request, res: Response) => {
   try {
     const {
       name,
@@ -17,6 +14,7 @@ export const createProduct = async (req, res) => {
       stock,
       locationId
     } = req.body
+
     const product = await createProductRepo({
       name,
       description,
@@ -25,7 +23,7 @@ export const createProduct = async (req, res) => {
       price,
       finalPrice
     })
-    
+
     await prisma.inventory.create({
       data: {
         productId: product.id,
@@ -37,6 +35,8 @@ export const createProduct = async (req, res) => {
     return res.json(product)
 
   } catch (err) {
-    return res.status(500).json({ message: 'error creating product' })
+    return res.status(500).json({
+      message: 'error creating product'
+    })
   }
 }
