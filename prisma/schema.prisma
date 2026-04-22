@@ -1,0 +1,51 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Employee {
+  id       Int     @id @default(autoincrement())
+  name     String
+  lastName String
+  email    String? @unique
+  password String?
+
+  role   Role @relation(fields: [roleId], references: [id])
+  roleId Int
+
+  regionalOffice   RegionalOffice @relation(fields: [regionalOfficeId], references: [id])
+  regionalOfficeId Int
+
+  isVisible Boolean @default(true)
+}
+
+model Role {
+  id                  Int        @id @default(autoincrement())
+  name                String
+  description         String?
+  employee            Employee[]
+  isVisible           Boolean    @default(true)
+  maxEmployeesAllowed Int        @default(1)
+}
+
+model RegionalOffice {
+  id           Int            @id @default(autoincrement())
+  name         String
+  regionalAbbr String?
+  employee     Employee[]
+  branches     BranchOffice[]
+  isVisible    Boolean        @default(true)
+}
+
+model BranchOffice {
+  id               Int            @id @default(autoincrement())
+  name             String
+  address          String
+  regionalOffice   RegionalOffice @relation(fields: [regionalOfficeId], references: [id])
+  regionalOfficeId Int
+  isVisible        Boolean        @default(true)
+}
