@@ -11,12 +11,6 @@ export const getAllEmloyees = async () => {
       name: true,
       lastName: true,
       email: true,
-      regionalOffice: {
-        select: {
-          id: true,
-          name: true
-        }
-      },
       role: {
         select: {
           id: true,
@@ -37,7 +31,7 @@ export const registerEmployeeRepository = async (newEmployeeData: Employee) => {
       lastName: newEmployeeData.lastName,
       email: newEmployeeData.email,
       password: newEmployeeData.password,
-      regionalOfficeId: newEmployeeData.regionalOfficeId,
+      //regionalOfficeId: newEmployeeData.regionalOfficeId,
       roleId: newEmployeeData.roleId
     },
     select: {
@@ -45,12 +39,7 @@ export const registerEmployeeRepository = async (newEmployeeData: Employee) => {
       name: true,
       lastName: true,
       email: true,
-      regionalOffice: {
-        select: {
-          id: true,
-          name: true
-        }
-      },
+      
       role: {
         select: {
           id: true,

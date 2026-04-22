@@ -9,12 +9,12 @@ config()
 
 export const signIn = async (req: Request, res: Response) => {
   try {
-    const { password, email } = req.body
-
-    const employeeFound = await prisma.employee.findUnique({
-      where: {
-        email: email
-      },
+    const { email, password } = req.body
+    if (!email || !password) {
+      return res.status(400).json({ message: 'email and password required' })
+    }
+    const employee = await prisma.employee.findUnique({
+      where: { email },
       select: {
         id: true,
         name: true,
@@ -26,40 +26,49 @@ export const signIn = async (req: Request, res: Response) => {
             name: true
           }
         },
-        regionalOffice: { 
-          select: { 
-            name: true
+        location: {
+          select: {
+            id: true,
+            name: true,
+            type: true
           }
         }
       }
     })
-
-    if (!employeeFound) {
+    if (!employee) {
       return res.status(400).json({ message: 'user not found' })
     }
-
-    const passwordIsValid = await bcrypt.compare(password, employeeFound?.password as string)
-
-    if (!passwordIsValid) {
-      return res.status(400).json({ message: 'password incorrect' })
+    const passwordValid = await bcrypt.compare(
+      password,
+      employee.password as string
+    )
+    if (!passwordValid) {
+      return res.status(400).json({ message: 'incorrect password' })
     }
+    const token = jwt.sign(
+      {
+        id: employee.id,
+        email: employee.email,
+        role: employee.role?.name,
+        locationId: employee.location ? employee.location.id : null
+      },
+      process.env.JWTSECRET as string,
+    )
 
-    const secret = process.env.JWTSECRET
-    const token = jwt.sign({ email: employeeFound?.email , id: employeeFound.id }, secret as string)
-
-    return res.status(200).json({
-      name: employeeFound?.name,
-      lastName: employeeFound?.lastName,
-      email: employeeFound?.email,
-      role: employeeFound.role?.name,
-      regionalOffice: employeeFound.regionalOffice?.name,
+    return res.json({
+      id: employee.id,
+      name: employee.name,
+      lastName: employee.lastName,
+      email: employee.email,
+      role: employee.role?.name,
+      location: employee.location,
       token
     })
+
   } catch (err) {
-    if (err instanceof Error) {
-      return res.status(500).json({ message: err.message })
-    }
-    return res.status(500).json({ message: 'internal server error' })
+    return res.status(500).json({
+      message: 'internal error'
+    })
   }
 }
 

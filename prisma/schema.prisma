@@ -7,6 +7,34 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+//////////////////////
+// 🏢 UBICACIONES
+//////////////////////
+
+model Location {
+  id        Int          @id @default(autoincrement())
+  name      String
+  type      LocationType
+  address   String?
+  isVisible Boolean      @default(true)
+
+  employees   Employee[]
+  inventories Inventory[]
+  sales       Sale[]
+
+  fromMovements StockMovement[] @relation("FromLocation")
+  toMovements   StockMovement[] @relation("ToLocation")
+}
+
+enum LocationType {
+  WAREHOUSE
+  BRANCH
+}
+
+//////////////////////
+// 👤 EMPLEADOS
+//////////////////////
+
 model Employee {
   id       Int     @id @default(autoincrement())
   name     String
@@ -17,8 +45,10 @@ model Employee {
   role   Role @relation(fields: [roleId], references: [id])
   roleId Int
 
-  regionalOffice   RegionalOffice @relation(fields: [regionalOfficeId], references: [id])
-  regionalOfficeId Int
+  location   Location? @relation(fields: [locationId], references: [id])
+  locationId Int?
+
+  sales Sale[]
 
   isVisible Boolean @default(true)
 }
@@ -32,20 +62,99 @@ model Role {
   maxEmployeesAllowed Int        @default(1)
 }
 
-model RegionalOffice {
-  id           Int            @id @default(autoincrement())
-  name         String
-  regionalAbbr String?
-  employee     Employee[]
-  branches     BranchOffice[]
-  isVisible    Boolean        @default(true)
+//////////////////////
+// 📦 PRODUCTOS
+//////////////////////
+
+model Product {
+  id          Int     @id @default(autoincrement())
+  name        String
+  description String?
+  barcode     String  @unique
+  imageUrl    String?
+  price       Float
+  finalPrice  Float
+  isVisible   Boolean @default(true)
+
+  inventories Inventory[]
+  movements   StockMovement[]
+  saleDetails SaleDetail[]
 }
 
-model BranchOffice {
-  id               Int            @id @default(autoincrement())
-  name             String
-  address          String
-  regionalOffice   RegionalOffice @relation(fields: [regionalOfficeId], references: [id])
-  regionalOfficeId Int
-  isVisible        Boolean        @default(true)
+//////////////////////
+// 📊 INVENTARIO
+//////////////////////
+
+model Inventory {
+  id Int @id @default(autoincrement())
+
+  product   Product @relation(fields: [productId], references: [id])
+  productId Int
+
+  location   Location @relation(fields: [locationId], references: [id])
+  locationId Int
+
+  quantity Int @default(0)
+
+  @@unique([productId, locationId])
+}
+
+//////////////////////
+// 🔄 MOVIMIENTOS DE STOCK
+//////////////////////
+
+model StockMovement {
+  id Int @id @default(autoincrement())
+
+  product   Product @relation(fields: [productId], references: [id])
+  productId Int
+
+  fromLocation   Location? @relation("FromLocation", fields: [fromLocationId], references: [id])
+  fromLocationId Int?
+
+  toLocation   Location? @relation("ToLocation", fields: [toLocationId], references: [id])
+  toLocationId Int?
+
+  quantity Int
+  type     MovementType
+
+  createdAt DateTime @default(now())
+}
+
+enum MovementType {
+  IN
+  OUT
+  TRANSFER
+}
+
+//////////////////////
+// 💰 VENTAS
+//////////////////////
+
+model Sale {
+  id   Int      @id @default(autoincrement())
+  date DateTime @default(now())
+
+  location   Location @relation(fields: [locationId], references: [id])
+  locationId Int
+
+  employee   Employee @relation(fields: [employeeId], references: [id])
+  employeeId Int
+
+  total Float
+
+  details SaleDetail[]
+}
+
+model SaleDetail {
+  id Int @id @default(autoincrement())
+
+  sale   Sale @relation(fields: [saleId], references: [id])
+  saleId Int
+
+  product   Product @relation(fields: [productId], references: [id])
+  productId Int
+
+  quantity Int
+  price    Float
 }
