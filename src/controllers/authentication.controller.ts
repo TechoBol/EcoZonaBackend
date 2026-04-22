@@ -9,11 +9,11 @@ config()
 
 export const signIn = async (req: Request, res: Response) => {
   try {
-    const { password, email } = req.body
+    const { password, username } = req.body
 
     const employeeFound = await prisma.employee.findUnique({
       where: {
-        email: email
+        email: username
       },
       select: {
         id: true,
