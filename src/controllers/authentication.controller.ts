@@ -30,7 +30,9 @@ export const signIn = async (req: Request, res: Response) => {
           select: {
             id: true,
             name: true,
-            type: true
+            type: true,
+            abbreviation : true,
+            saleCounter:true
           }
         }
       }

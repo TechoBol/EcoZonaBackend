@@ -18,6 +18,9 @@ model Location {
   address   String?
   isVisible Boolean      @default(true)
 
+  abbreviation String? // 🔥 EJ: CBBA, LPZ
+  saleCounter  Int?    @default(0) // 🔥 contador de ventas
+
   employees   Employee[]
   inventories Inventory[]
   sales       Sale[]
@@ -142,6 +145,9 @@ model Sale {
   employeeId Int
 
   total Float
+
+  code   String? // 🔥 CBBA-1
+  pdfUrl String? // 🔥 ruta S3
 
   details SaleDetail[]
 }
