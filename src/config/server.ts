@@ -15,7 +15,7 @@ app.use(compression())
 app.use(express.json())
 app.use(urlencoded({ extended: true }))
 
-app.use('/api/authentication',verifyToken, authenticationRoute)
+app.use('/api/authentication', authenticationRoute)
 app.use('/api/product',verifyToken, productRoute)
 app.use('/api/sale',verifyToken, saleRoute)
 

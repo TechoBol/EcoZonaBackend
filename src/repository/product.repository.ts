@@ -1,15 +1,58 @@
 import prisma from '../config/db'
 
-// Crear producto
-export const createProductRepo = async (data: { name: any; description: any; barcode: any; imageUrl: any; price: any; finalPrice: any }) => {
-  return await prisma.product.create({
+type CreateProductDTO = {
+  name: string
+  description?: string
+  barcode: string
+  imageUrl?: string
+  price: number
+  finalPrice: number
+}
+
+type UpdateProductDTO = Partial<CreateProductDTO>
+
+// 🔥 CREAR PRODUCTO
+export const createProductRepo = async (data: CreateProductDTO) => {
+  return prisma.product.create({
     data
   })
 }
 
-// Buscar por barcode (clave para ventas)
-export const getProductByBarcodeRepo = async (barcode: any) => {
-  return await prisma.product.findUnique({
-    where: { barcode }
+// 🔥 OBTENER TODOS
+export const getProductsRepo = async () => {
+  return prisma.product.findMany({
+    where: { isVisible: true },
+    include: {
+      inventories: true
+    }
+  })
+}
+
+// 🔥 OBTENER UNO
+export const getProductByIdRepo = async (id: number) => {
+  return prisma.product.findUnique({
+    where: { id },
+    include: {
+      inventories: true
+    }
+  })
+}
+
+// 🔥 ACTUALIZAR
+export const updateProductRepo = async (
+  id: number,
+  data: UpdateProductDTO
+) => {
+  return prisma.product.update({
+    where: { id },
+    data
+  })
+}
+
+// 🔥 DELETE LÓGICO
+export const deleteProductRepo = async (id: number) => {
+  return prisma.product.update({
+    where: { id },
+    data: { isVisible: false }
   })
 }
