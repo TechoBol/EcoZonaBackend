@@ -8,7 +8,6 @@ import {
   deleteProductRepo,
 } from "../repository/product.repository";
 
-// 🔥 CREATE
 export const createProduct = async (req: Request, res: Response) => {
   try {
     const {
