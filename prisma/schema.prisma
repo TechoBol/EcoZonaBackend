@@ -150,6 +150,9 @@ model Sale {
   pdfUrl String? // 🔥 ruta S3
 
   details SaleDetail[]
+
+  typeSale          String?
+  transactionNumber String?
 }
 
 model SaleDetail {

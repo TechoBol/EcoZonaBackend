@@ -1,58 +1,59 @@
-import prisma from '../config/db'
+import prisma from "../config/db";
 
 type CreateProductDTO = {
-  name: string
-  description?: string
-  barcode: string
-  imageUrl?: string
-  price: number
-  finalPrice: number
-}
+  name: string;
+  description?: string;
+  barcode: string;
+  imageUrl?: string;
+  price: number;
+  finalPrice: number;
+};
 
-type UpdateProductDTO = Partial<CreateProductDTO>
+type UpdateProductDTO = Partial<CreateProductDTO>;
 
 // 🔥 CREAR PRODUCTO
 export const createProductRepo = async (data: CreateProductDTO) => {
   return prisma.product.create({
-    data
-  })
-}
+    data,
+  });
+};
 
 // 🔥 OBTENER TODOS
-export const getProductsRepo = async () => {
+export const getProductsRepo = async (locationId: number) => {
   return prisma.product.findMany({
     where: { isVisible: true },
     include: {
-      inventories: true
-    }
-  })
-}
+      inventories: {
+        where: {
+          locationId: locationId,
+        },
+      },
+    },
+  });
+};
 
 // 🔥 OBTENER UNO
 export const getProductByIdRepo = async (id: number) => {
   return prisma.product.findUnique({
     where: { id },
     include: {
-      inventories: true
-    }
-  })
-}
+      inventories: true,
+    },
+  });
+};
 
 // 🔥 ACTUALIZAR
-export const updateProductRepo = async (
-  id: number,
-  data: UpdateProductDTO
-) => {
+export const updateProductRepo = async (id: number, data: UpdateProductDTO) => {
   return prisma.product.update({
     where: { id },
-    data
-  })
-}
+    data,
+  });
+};
 
 // 🔥 DELETE LÓGICO
 export const deleteProductRepo = async (id: number) => {
   return prisma.product.update({
     where: { id },
-    data: { isVisible: false }
-  })
-}
+    data: { isVisible: false },
+  });
+};

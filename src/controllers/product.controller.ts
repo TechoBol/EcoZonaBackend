@@ -7,6 +7,7 @@ import {
   updateProductRepo,
   deleteProductRepo,
 } from "../repository/product.repository";
+import jwt from "jsonwebtoken";
 
 export const createProduct = async (req: Request, res: Response) => {
   try {
@@ -71,9 +72,12 @@ export const createProduct = async (req: Request, res: Response) => {
 };
 
 // 🔥 GET ALL
-export const getProducts = async (_req: Request, res: Response) => {
+export const getProducts = async (req: Request, res: Response) => {
   try {
-    const products = await getProductsRepo();
+    const token = req.headers["x-access-token"] as string;
+
+    const user = jwt.verify(token, process.env.JWTSECRET!) as any;
+    const products = await getProductsRepo(Number(user.locationId));
     return res.json(products);
   } catch {
     return res.status(500).json({ message: "error fetching products" });

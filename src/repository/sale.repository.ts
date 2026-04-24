@@ -1,3 +1,4 @@
+import prisma from "../config/db";
 
 // 🔥 CREAR SALE
 export const createSaleRepo = async (tx: any, data: any) => {
@@ -59,5 +60,31 @@ export const updateInventoryRepo = async (tx: any, productId: number, locationId
 export const getProductRepo = async (tx: any, productId: number) => {
   return await tx.product.findUnique({
     where: { id: productId },
+  });
+};
+
+export const getSalesRepo = async () => {
+  return prisma.sale.findMany({
+    select: {
+      id: true,
+      code: true,
+      total: true,
+      date: true,
+      pdfUrl: true,
+      location: {
+        select: {
+          name: true,
+        },
+      },
+      employee: {
+        select: {
+          name: true,
+          lastName: true,
+        },
+      },
+    },
+    orderBy: {
+      date: "desc",
+    },
   });
 };
