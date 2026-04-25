@@ -109,7 +109,7 @@ export const updateProduct = async (req: Request, res: Response) => {
     const updated = await updateProductRepo(id, req.body);
 
     return res.json(updated);
-  } catch {
+  } catch (error) {
     return res.status(500).json({ message: "error updating product" });
   }
 };
