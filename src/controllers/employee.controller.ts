@@ -78,14 +78,20 @@ export const updateEmployee = async (req: Request, res: Response) => {
       return res.status(400).json({ message: "id inválido" });
     }
 
-    const { name, lastName, email, roleId, locationId } = req.body;
+    const { name, lastName, email, roleId, locationId, password } = req.body;
+    let hashedPassword = null;
 
+    if (password) {
+      const saltRounds = 10; // puedes subirlo a 12 si quieres más seguridad
+      hashedPassword = await bcrypt.hash(password, saltRounds);
+    }
     const data = await updateEmployeeRepo(id, {
       name,
       lastName,
       email,
       roleId,
       locationId,
+      password: hashedPassword,
     });
 
     return res.json(data);
