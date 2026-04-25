@@ -95,7 +95,7 @@ export const createSale = async (req: Request, res: Response) => {
       });
 
       return fullSale;
-    });
+    }, { timeout: 15000 });
 
     return res.json({
       message: "sale completed",
