@@ -7,6 +7,7 @@ import {
   getOneEmployeeToValidateToken,
   changePasswordRepository,
 } from "../repository/employee.repository";
+import bcrypt from "bcrypt";
 
 //////////////////////////////
 // 🔥 GET ALL
@@ -35,11 +36,19 @@ export const createEmployee = async (req: Request, res: Response) => {
       });
     }
 
+    // 🔐 CIFRAR PASSWORD
+    let hashedPassword = null;
+
+    if (password) {
+      const saltRounds = 10; // puedes subirlo a 12 si quieres más seguridad
+      hashedPassword = await bcrypt.hash(password, saltRounds);
+    }
+
     const data = await createEmployeeRepo({
       name,
       lastName,
       email,
-      password,
+      password: hashedPassword, // 👈 aquí mandas el hash, NO el password original
       roleId,
       locationId,
     });
@@ -48,7 +57,6 @@ export const createEmployee = async (req: Request, res: Response) => {
   } catch (error: any) {
     console.error(error);
 
-    // 🔥 error por email duplicado
     if (error.code === "P2002") {
       return res.status(400).json({
         message: "El email ya está registrado",
