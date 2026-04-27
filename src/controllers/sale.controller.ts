@@ -1,78 +1,130 @@
-import { Request, Response } from 'express'
-import prisma from '../config/db'
+import { Request, Response } from "express";
+import prisma from "../config/db";
 import {
   createSaleRepo,
   createSaleDetailRepo,
   getInventoryRepo,
-  updateInventoryRepo
-} from '../repository/sale.repository'
+  updateInventoryRepo,
+  incrementLocationCounterRepo,
+  getProductRepo,
+  updateSaleTotalRepo,
+  getSalesRepo,
+} from "../repository/sale.repository";
+import jwt from "jsonwebtoken";
 
 export const createSale = async (req: Request, res: Response) => {
   try {
-    const { employeeId, locationId, products } = req.body
+    const { locationId, products, codigoTransaccion, metodoPago, discount } =
+      req.body;
+    const token = req.headers["x-access-token"] as string;
 
-    let total = 0
+    const user = jwt.verify(token, process.env.JWTSECRET!) as any;
 
-    for (const item of products) {
-      const inventory = await getInventoryRepo(
-        item.productId,
-        locationId
-      )
+    const sale = await prisma.$transaction(
+      async (tx) => {
+        let total = 0;
 
-      if (!inventory || inventory.quantity < item.quantity) {
-        return res.status(400).json({
-          message: 'insufficient stock'
-        })
-      }
-    }
+        // 🔥 1. validar stock
+        for (const item of products) {
+          const inventory = await getInventoryRepo(
+            tx,
+            item.productId,
+            locationId,
+          );
 
-    const sale = await createSaleRepo({
-      employeeId,
-      locationId,
-      total: 0
-    })
+          if (!inventory || inventory.quantity < item.quantity) {
+            throw new Error("insufficient stock");
+          }
+        }
 
-    for (const item of products) {
-      const product = await prisma.product.findUnique({
-        where: { id: item.productId }
-      })
+        // 🔥 2. incrementar contador
+        const location = await incrementLocationCounterRepo(tx, locationId);
 
-      if (!product) {
-        return res.status(400).json({
-          message: 'product not found'
-        })
-      }
+        const saleNumber = location.saleCounter;
+        const code = `${location.abbreviation}-${saleNumber}`;
 
-      const price = product.finalPrice
+        // 🔥 3. crear venta
+        const newSale = await createSaleRepo(tx, {
+          employeeId: user.id,
+          locationId,
+          total: 0,
+          code,
+          pdfUrl: `ECOZONA/SALES/${code}.pdf`,
+          typeSale: metodoPago,
+          transactionNumber: codigoTransaccion,
+        });
 
-      total += price * item.quantity
+        // 🔥 4. detalles + cálculo total
+        for (const item of products) {
+          const product = await getProductRepo(tx, item.productId);
 
-      await createSaleDetailRepo({
-        saleId: sale.id,
-        productId: item.productId,
-        quantity: item.quantity,
-        price
-      })
+          if (!product) throw new Error("product not found");
 
-      await updateInventoryRepo(
-        item.productId,
-        locationId,
-        item.quantity
-      )
-    }
+          const price = product.finalPrice;
 
-    await prisma.sale.update({
-      where: { id: sale.id },
-      data: { total }
-    })
+          total += price * item.quantity;
+
+          await createSaleDetailRepo(tx, {
+            saleId: newSale.id,
+            productId: item.productId,
+            quantity: item.quantity,
+            price,
+          });
+
+          await updateInventoryRepo(
+            tx,
+            item.productId,
+            locationId,
+            item.quantity,
+          );
+        }
+
+        // 🔥 5. actualizar total
+        await updateSaleTotalRepo(tx, newSale.id, (total - discount));
+
+        // 🔥 6. traer venta completa
+        const fullSale = await tx.sale.findUnique({
+          where: { id: newSale.id },
+          include: {
+            location: true,
+            employee: true,
+            details: {
+              include: {
+                product: true,
+              },
+            },
+          },
+        });
+
+        return fullSale;
+      },
+      { timeout: 15000 },
+    );
 
     return res.json({
-      message: 'sale completed',
-      saleId: sale.id,
-      total
-    })
-
-  } catch (err) {
-    return res.status(500).json({ message: 'error creating sale' })
+      message: "sale completed",
+      sale,
+    });
+  } catch (err: any) {
+    return res.status(500).json({
+      message: err.message || "error creating sale",
+    });
   }
-}
+};
+
+export const getSales = async (req: Request, res: Response) => {
+  try {
+    const token = req.headers["x-access-token"] as string;
+    const user = jwt.verify(token, process.env.JWTSECRET!) as any;
+
+    const isManagement = user.role.includes("Gerente");
+
+    const data = await getSalesRepo(Number(user.locationId), isManagement);
+
+    return res.json(data);
+  } catch (error) {
+    return res.status(500).json({
+      message: "error getting sales",
+    });
+  }
+};

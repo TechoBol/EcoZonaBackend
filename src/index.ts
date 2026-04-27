@@ -3,6 +3,7 @@ import { config } from 'dotenv'
 
 import http from 'http'
 import { Server as SocketServer } from 'socket.io'
+import intentorySocketInstance from './sockets/inventory.sockets'
 
 config()
 
@@ -14,6 +15,7 @@ const io = new SocketServer(server, {
     origin: `*`
   }
 })
+intentorySocketInstance(io)
 
 io.on('connection', socket => {
   console.log('a user connected ' + socket.id)
