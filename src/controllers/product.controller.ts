@@ -71,13 +71,16 @@ export const createProduct = async (req: Request, res: Response) => {
   }
 };
 
-// 🔥 GET ALL
 export const getProducts = async (req: Request, res: Response) => {
   try {
     const token = req.headers["x-access-token"] as string;
-
     const user = jwt.verify(token, process.env.JWTSECRET!) as any;
-    const products = await getProductsRepo(Number(user.locationId));
+    console.log(user.role);
+    const isManagement = user.role.includes("Gerente");
+    const products = await getProductsRepo(
+      Number(user.locationId),
+      isManagement,
+    );
     return res.json(products);
   } catch {
     return res.status(500).json({ message: "error fetching products" });

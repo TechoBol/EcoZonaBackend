@@ -6,7 +6,11 @@ export const createSaleRepo = async (tx: any, data: any) => {
 };
 
 // 🔥 ACTUALIZAR TOTAL
-export const updateSaleTotalRepo = async (tx: any, saleId: number, total: number) => {
+export const updateSaleTotalRepo = async (
+  tx: any,
+  saleId: number,
+  total: number,
+) => {
   return await tx.sale.update({
     where: { id: saleId },
     data: { total },
@@ -14,7 +18,10 @@ export const updateSaleTotalRepo = async (tx: any, saleId: number, total: number
 };
 
 // 🔥 INCREMENTAR CONTADOR Y OBTENER LOCATION
-export const incrementLocationCounterRepo = async (tx: any, locationId: number) => {
+export const incrementLocationCounterRepo = async (
+  tx: any,
+  locationId: number,
+) => {
   return await tx.location.update({
     where: { id: locationId },
     data: {
@@ -29,7 +36,11 @@ export const createSaleDetailRepo = async (tx: any, data: any) => {
 };
 
 // 🔥 INVENTARIO
-export const getInventoryRepo = async (tx: any, productId: number, locationId: number) => {
+export const getInventoryRepo = async (
+  tx: any,
+  productId: number,
+  locationId: number,
+) => {
   return await tx.inventory.findUnique({
     where: {
       productId_locationId: {
@@ -40,7 +51,12 @@ export const getInventoryRepo = async (tx: any, productId: number, locationId: n
   });
 };
 
-export const updateInventoryRepo = async (tx: any, productId: number, locationId: number, qty: number) => {
+export const updateInventoryRepo = async (
+  tx: any,
+  productId: number,
+  locationId: number,
+  qty: number,
+) => {
   return await tx.inventory.update({
     where: {
       productId_locationId: {
@@ -63,14 +79,24 @@ export const getProductRepo = async (tx: any, productId: number) => {
   });
 };
 
-export const getSalesRepo = async () => {
+export const getSalesRepo = async (
+  locationId: number,
+  isManagement: boolean,
+) => {
   return prisma.sale.findMany({
+    where: isManagement
+      ? {} 
+      : {
+          locationId: locationId, // 🔥 solo su sucursal
+        },
+
     select: {
       id: true,
       code: true,
       total: true,
       date: true,
       pdfUrl: true,
+      typeSale: true,
       location: {
         select: {
           name: true,
@@ -83,6 +109,7 @@ export const getSalesRepo = async () => {
         },
       },
     },
+
     orderBy: {
       date: "desc",
     },
