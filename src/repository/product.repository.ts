@@ -17,16 +17,54 @@ export const createProductRepo = async (data: CreateProductDTO) => {
 };
 
 // 🔥 OBTENER TODOS
-export const getProductsRepo = async (locationId: number) => {
-  return prisma.product.findMany({
+// ✅ así debe estar la firma
+export const getProductsRepo = async (
+  locationId: number,
+  isManagement: boolean,
+) => {
+  // 🔥 GERENCIA: trae inventarios de todas las sucursales con su info
+  if (isManagement) {
+    const products = await prisma.product.findMany({
+      where: { isVisible: true },
+      include: {
+        inventories: {
+          include: {
+            location: {
+              select: { id: true, name: true },
+            },
+          },
+        },
+      },
+    });
+
+    return products
+      .map((p) => ({
+        ...p,
+        inventories: undefined,
+        stockTotal: p.inventories.reduce((acc, inv) => acc + inv.quantity, 0),
+        stockBySucursal: p.inventories.map((inv) => ({
+          locationId: inv.locationId,
+          locationName: inv.location.name,
+          quantity: inv.quantity,
+        })),
+      }))
+      .sort((a, b) => b.stockTotal - a.stockTotal);
+  }
+
+  // 🔥 EMPLEADO NORMAL: comportamiento original sin tocar nada
+  const products = await prisma.product.findMany({
     where: { isVisible: true },
     include: {
       inventories: {
-        where: {
-          locationId: locationId,
-        },
+        where: { locationId },
       },
     },
+  });
+
+  return products.sort((a, b) => {
+    const stockA = a.inventories[0]?.quantity || 0;
+    const stockB = b.inventories[0]?.quantity || 0;
+    return stockB - stockA;
   });
 };
 
