@@ -4,10 +4,18 @@ import { Employee } from "@prisma/client";
 //////////////////////////////
 // 🔥 GET ALL
 //////////////////////////////
-export const getEmployeesRepo = async () => {
+export const getEmployeesRepo = async (
+  locationId: number,
+  isManagement: boolean,
+) => {
   return prisma.employee.findMany({
     where: {
       isVisible: true,
+      ...(isManagement
+        ? {}
+        : {
+            locationId: locationId, // 🔥 solo su sucursal
+          }),
     },
     select: {
       id: true,
@@ -72,7 +80,7 @@ export const createEmployeeRepo = async (data: Partial<Employee>) => {
 //////////////////////////////
 export const updateEmployeeRepo = async (
   id: number,
-  data: Partial<Employee>
+  data: Partial<Employee>,
 ) => {
   return prisma.employee.update({
     where: { id },
@@ -82,7 +90,7 @@ export const updateEmployeeRepo = async (
       email: data.email,
       roleId: data.roleId,
       locationId: data.locationId ?? null,
-      password : data.password ?? null
+      password: data.password ?? null,
     },
     select: {
       id: true,
@@ -123,7 +131,7 @@ export const deleteEmployeeRepo = async (id: number) => {
 //////////////////////////////
 export const getOneEmployeeToValidateToken = async (
   id: number,
-  password: string
+  password: string,
 ) => {
   return prisma.employee.findFirst({
     where: {
@@ -142,7 +150,7 @@ export const getOneEmployeeToValidateToken = async (
 //////////////////////////////
 export const changePasswordRepository = async (
   id: number,
-  newPassword: string
+  newPassword: string,
 ) => {
   return prisma.employee.update({
     where: { id },
