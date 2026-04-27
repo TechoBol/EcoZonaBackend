@@ -82,6 +82,7 @@ export const updateEmployeeRepo = async (
       email: data.email,
       roleId: data.roleId,
       locationId: data.locationId ?? null,
+      password : data.password ?? null
     },
     select: {
       id: true,
