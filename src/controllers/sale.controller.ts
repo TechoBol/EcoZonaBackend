@@ -14,7 +14,8 @@ import jwt from "jsonwebtoken";
 
 export const createSale = async (req: Request, res: Response) => {
   try {
-    const { locationId, products, codigoTransaccion, metodoPago } = req.body;
+    const { locationId, products, codigoTransaccion, metodoPago, discount } =
+      req.body;
     const token = req.headers["x-access-token"] as string;
 
     const user = jwt.verify(token, process.env.JWTSECRET!) as any;
@@ -79,7 +80,7 @@ export const createSale = async (req: Request, res: Response) => {
         }
 
         // 🔥 5. actualizar total
-        await updateSaleTotalRepo(tx, newSale.id, total);
+        await updateSaleTotalRepo(tx, newSale.id, (total - discount));
 
         // 🔥 6. traer venta completa
         const fullSale = await tx.sale.findUnique({

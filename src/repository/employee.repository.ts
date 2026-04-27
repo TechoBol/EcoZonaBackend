@@ -1,9 +1,6 @@
 import prisma from "../config/db";
 import { Employee } from "@prisma/client";
 
-//////////////////////////////
-// 🔥 GET ALL
-//////////////////////////////
 export const getEmployeesRepo = async (
   locationId: number,
   isManagement: boolean,
@@ -41,9 +38,6 @@ export const getEmployeesRepo = async (
   });
 };
 
-//////////////////////////////
-// 🔥 CREATE
-//////////////////////////////
 export const createEmployeeRepo = async (data: Partial<Employee>) => {
   return prisma.employee.create({
     data: {
@@ -51,8 +45,8 @@ export const createEmployeeRepo = async (data: Partial<Employee>) => {
       lastName: data.lastName!,
       email: data.email || null,
       password: data.password || null,
-      roleId: data.roleId!, // obligatorio
-      locationId: data.locationId || null, // opcional
+      roleId: data.roleId!,
+      locationId: data.locationId || null, 
     },
     select: {
       id: true,
@@ -75,9 +69,6 @@ export const createEmployeeRepo = async (data: Partial<Employee>) => {
   });
 };
 
-//////////////////////////////
-// 🔥 UPDATE
-//////////////////////////////
 export const updateEmployeeRepo = async (
   id: number,
   data: Partial<Employee>,
@@ -90,7 +81,7 @@ export const updateEmployeeRepo = async (
       email: data.email,
       roleId: data.roleId,
       locationId: data.locationId ?? null,
-      password: data.password ?? null,
+      ...(data.password && { password: data.password }), 
     },
     select: {
       id: true,
@@ -113,9 +104,6 @@ export const updateEmployeeRepo = async (
   });
 };
 
-//////////////////////////////
-// 🔥 DELETE (SOFT DELETE)
-//////////////////////////////
 export const deleteEmployeeRepo = async (id: number) => {
   return prisma.employee.update({
     where: { id },
@@ -126,9 +114,6 @@ export const deleteEmployeeRepo = async (id: number) => {
   });
 };
 
-//////////////////////////////
-// 🔥 GET ONE (LOGIN VALIDATION)
-//////////////////////////////
 export const getOneEmployeeToValidateToken = async (
   id: number,
   password: string,
@@ -145,9 +130,6 @@ export const getOneEmployeeToValidateToken = async (
   });
 };
 
-//////////////////////////////
-// 🔥 CHANGE PASSWORD
-//////////////////////////////
 export const changePasswordRepository = async (
   id: number,
   newPassword: string,
