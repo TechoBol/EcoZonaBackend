@@ -8,13 +8,23 @@ import {
   changePasswordRepository,
 } from "../repository/employee.repository";
 import bcrypt from "bcrypt";
+import jwt from "jsonwebtoken";
 
 //////////////////////////////
 // 🔥 GET ALL
 //////////////////////////////
-export const getEmployees = async (_: Request, res: Response) => {
+export const getEmployees = async (req: Request, res: Response) => {
   try {
-    const data = await getEmployeesRepo();
+    const token = req.headers["x-access-token"] as string;
+    const user = jwt.verify(token, process.env.JWTSECRET!) as any;
+
+    const isManagement = user.role.includes("Gerente");
+
+    const data = await getEmployeesRepo(
+      Number(user.locationId),
+      isManagement
+    );
+
     return res.json(data);
   } catch (error) {
     console.error(error);
