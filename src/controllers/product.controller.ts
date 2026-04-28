@@ -30,7 +30,7 @@ export const createProduct = async (req: Request, res: Response) => {
       locationId == null
     ) {
       return res.status(400).json({
-        message: "missing required fields",
+        message: "Por favor, completa los campos requeridos",
       });
     }
 
@@ -61,12 +61,12 @@ export const createProduct = async (req: Request, res: Response) => {
   } catch (err: any) {
     if (err.code === "P2002") {
       return res.status(400).json({
-        message: "Producto ya registrado",
+        message: "El producto ya está registrado",
       });
     }
 
     return res.status(500).json({
-      message: "Error al crear producto",
+      message: "No se pudo crear el producto",
     });
   }
 };
@@ -86,11 +86,11 @@ export const getProducts = async (req: Request, res: Response) => {
     );
     return res.json(products);
   } catch {
-    return res.status(500).json({ message: "error fetching products" });
+    return res.status(500).json({ message: "No se pudieron obtener los productos" });
   }
 };
 
-// 🔥 GET ONE
+// GET ONE
 export const getProductById = async (req: Request, res: Response) => {
   try {
     const id = Number(req.params.id);
@@ -98,16 +98,16 @@ export const getProductById = async (req: Request, res: Response) => {
     const product = await getProductByIdRepo(id);
 
     if (!product) {
-      return res.status(404).json({ message: "product not found" });
+      return res.status(404).json({ message: "No se encontró el producto" });
     }
 
     return res.json(product);
   } catch {
-    return res.status(500).json({ message: "error fetching product" });
+    return res.status(500).json({ message: "No se pudo cargar el producto" });
   }
 };
 
-// 🔥 UPDATE
+// UPDATE
 export const updateProduct = async (req: Request, res: Response) => {
   try {
     const id = Number(req.params.id);
@@ -116,19 +116,19 @@ export const updateProduct = async (req: Request, res: Response) => {
 
     return res.json(updated);
   } catch (error) {
-    return res.status(500).json({ message: "Error al actualizar producto" });
+    return res.status(500).json({ message: "No se pudo actualizar el producto" });
   }
 };
 
-// 🔥 DELETE (soft delete)
+// DELETE (soft delete)
 export const deleteProduct = async (req: Request, res: Response) => {
   try {
     const id = Number(req.params.id);
 
     await deleteProductRepo(id);
 
-    return res.json({ message: "product deleted" });
+    return res.json({ message: "Producto eliminado" });
   } catch {
-    return res.status(500).json({ message: "error deleting product" });
+    return res.status(500).json({ message: "No se pudo eliminar el producto" });
   }
 };

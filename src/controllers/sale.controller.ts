@@ -24,7 +24,7 @@ export const createSale = async (req: Request, res: Response) => {
       async (tx) => {
         let total = 0;
 
-        // 🔥 1. validar stock
+        // 1. validar stock
         for (const item of products) {
           const inventory = await getInventoryRepo(
             tx,
@@ -37,13 +37,13 @@ export const createSale = async (req: Request, res: Response) => {
           }
         }
 
-        // 🔥 2. incrementar contador
+        // 2. incrementar contador
         const location = await incrementLocationCounterRepo(tx, locationId);
 
         const saleNumber = location.saleCounter;
         const code = `${location.abbreviation}-${saleNumber}`;
 
-        // 🔥 3. crear venta
+        // 3. crear venta
         const newSale = await createSaleRepo(tx, {
           employeeId: user.id,
           locationId,
@@ -54,7 +54,7 @@ export const createSale = async (req: Request, res: Response) => {
           transactionNumber: codigoTransaccion,
         });
 
-        // 🔥 4. detalles + cálculo total
+        // 4. detalles + cálculo total
         for (const item of products) {
           const product = await getProductRepo(tx, item.productId);
 
@@ -79,10 +79,10 @@ export const createSale = async (req: Request, res: Response) => {
           );
         }
 
-        // 🔥 5. actualizar total
+        // 5. actualizar total
         await updateSaleTotalRepo(tx, newSale.id, total - discount);
 
-        // 🔥 6. traer venta completa
+        // 6. traer venta completa
         const fullSale = await tx.sale.findUnique({
           where: { id: newSale.id },
           include: {
@@ -102,12 +102,12 @@ export const createSale = async (req: Request, res: Response) => {
     );
 
     return res.json({
-      message: "sale completed",
+      message: "Venta completada",
       sale,
     });
   } catch (err: any) {
     return res.status(500).json({
-      message: err.message || "error creating sale",
+      message: err.message || "No se pudo crear la venta",
     });
   }
 };
@@ -127,7 +127,7 @@ export const getSales = async (req: Request, res: Response) => {
     return res.json(data);
   } catch (error) {
     return res.status(500).json({
-      message: "error getting sales",
+      message: "No se pudieron obtener las ventas",
     });
   }
 };
