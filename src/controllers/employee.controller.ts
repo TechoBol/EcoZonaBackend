@@ -18,12 +18,12 @@ export const getEmployees = async (req: Request, res: Response) => {
     const token = req.headers["x-access-token"] as string;
     const user = jwt.verify(token, process.env.JWTSECRET!) as any;
 
-    const isManagement = user.role.includes("Gerente");
+    const isManagement =
+      user.role.includes("Gerente") ||
+      user.role.includes("Subgerente") ||
+      user.role.includes("Jefe");
 
-    const data = await getEmployeesRepo(
-      Number(user.locationId),
-      isManagement
-    );
+    const data = await getEmployeesRepo(Number(user.locationId), isManagement);
 
     return res.json(data);
   } catch (error) {
