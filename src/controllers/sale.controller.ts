@@ -80,7 +80,7 @@ export const createSale = async (req: Request, res: Response) => {
         }
 
         // 🔥 5. actualizar total
-        await updateSaleTotalRepo(tx, newSale.id, (total - discount));
+        await updateSaleTotalRepo(tx, newSale.id, total - discount);
 
         // 🔥 6. traer venta completa
         const fullSale = await tx.sale.findUnique({
@@ -117,7 +117,10 @@ export const getSales = async (req: Request, res: Response) => {
     const token = req.headers["x-access-token"] as string;
     const user = jwt.verify(token, process.env.JWTSECRET!) as any;
 
-    const isManagement = user.role.includes("Gerente");
+    const isManagement =
+      user.role.includes("Gerente") ||
+      user.role.includes("Subgerente") ||
+      user.role.includes("Jefe");
 
     const data = await getSalesRepo(Number(user.locationId), isManagement);
 

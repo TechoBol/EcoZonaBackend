@@ -61,12 +61,12 @@ export const createProduct = async (req: Request, res: Response) => {
   } catch (err: any) {
     if (err.code === "P2002") {
       return res.status(400).json({
-        message: "barcode already exists",
+        message: "Producto ya registrado",
       });
     }
 
     return res.status(500).json({
-      message: "error creating product",
+      message: "Error al crear producto",
     });
   }
 };
@@ -76,7 +76,10 @@ export const getProducts = async (req: Request, res: Response) => {
     const token = req.headers["x-access-token"] as string;
     const user = jwt.verify(token, process.env.JWTSECRET!) as any;
     console.log(user.role);
-    const isManagement = user.role.includes("Gerente");
+    const isManagement =
+      user.role.includes("Gerente") ||
+      user.role.includes("Subgerente") ||
+      user.role.includes("Jefe");
     const products = await getProductsRepo(
       Number(user.locationId),
       isManagement,
@@ -113,7 +116,7 @@ export const updateProduct = async (req: Request, res: Response) => {
 
     return res.json(updated);
   } catch (error) {
-    return res.status(500).json({ message: "error updating product" });
+    return res.status(500).json({ message: "Error al actualizar producto" });
   }
 };
 
