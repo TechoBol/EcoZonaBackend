@@ -89,19 +89,20 @@ export const updateEmployee = async (req: Request, res: Response) => {
     }
 
     const { name, lastName, email, roleId, locationId, password } = req.body;
-    let hashedPassword = null;
 
+    let hashedPassword;
     if (password) {
-      const saltRounds = 10; // puedes subirlo a 12 si quieres más seguridad
+      const saltRounds = 10;
       hashedPassword = await bcrypt.hash(password, saltRounds);
     }
+
     const data = await updateEmployeeRepo(id, {
       name,
       lastName,
       email,
       roleId,
       locationId,
-      password: hashedPassword,
+      ...(hashedPassword && { password: hashedPassword }), // 🔥 clave
     });
 
     return res.json(data);
