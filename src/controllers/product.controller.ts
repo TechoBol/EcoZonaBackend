@@ -20,20 +20,50 @@ export const createProduct = async (req: Request, res: Response) => {
       finalPrice,
       stock,
       locationId,
+      lineId,
+      brandName,
     } = req.body;
 
+    // 🔎 VALIDACIÓN
     if (
       !name ||
       !barcode ||
       price == null ||
       finalPrice == null ||
-      locationId == null
+      locationId == null ||
+      !lineId ||
+      !brandName
     ) {
       return res.status(400).json({
         message: "Por favor, completa los campos requeridos",
       });
     }
 
+    // 🔎 VALIDAR LÍNEA
+    const line = await prisma.line.findUnique({
+      where: { id: Number(lineId) },
+    });
+
+    if (!line) {
+      return res.status(400).json({
+        message: "Línea inválida",
+      });
+    }
+
+    // 🔎 VALIDAR MARCA (STRING[])
+    const brands = (line.brands as string[]) || [];
+
+    const isValidBrand = brands.some(
+      (b) => b.toLowerCase().trim() === brandName.toLowerCase().trim()
+    );
+
+    if (!isValidBrand) {
+      return res.status(400).json({
+        message: "La marca no pertenece a la línea",
+      });
+    }
+
+    // 🔥 CREAR
     const result = await prisma.$transaction(async (tx) => {
       const product = await tx.product.create({
         data: {
@@ -43,6 +73,8 @@ export const createProduct = async (req: Request, res: Response) => {
           imageUrl,
           price: Number(price),
           finalPrice: Number(finalPrice),
+          lineId: Number(lineId),
+          brandName: brandName.trim(),
         },
       });
 
@@ -59,6 +91,8 @@ export const createProduct = async (req: Request, res: Response) => {
 
     return res.json(result);
   } catch (err: any) {
+    console.error(err);
+
     if (err.code === "P2002") {
       return res.status(400).json({
         message: "El producto ya está registrado",
@@ -75,18 +109,22 @@ export const getProducts = async (req: Request, res: Response) => {
   try {
     const token = req.headers["x-access-token"] as string;
     const user = jwt.verify(token, process.env.JWTSECRET!) as any;
-    console.log(user.role);
+
     const isManagement =
       user.role.includes("Gerente") ||
       user.role.includes("Subgerente") ||
       user.role.includes("Jefe");
+
     const products = await getProductsRepo(
       Number(user.locationId),
-      isManagement,
+      isManagement
     );
+
     return res.json(products);
   } catch {
-    return res.status(500).json({ message: "No se pudieron obtener los productos" });
+    return res
+      .status(500)
+      .json({ message: "No se pudieron obtener los productos" });
   }
 };
 
@@ -112,15 +150,73 @@ export const updateProduct = async (req: Request, res: Response) => {
   try {
     const id = Number(req.params.id);
 
-    const updated = await updateProductRepo(id, req.body);
+    const {
+      name,
+      description,
+      barcode,
+      imageUrl,
+      price,
+      finalPrice,
+      stock,
+      locationId,
+      lineId,
+      brandName,
+    } = req.body;
+
+    if (!name || !barcode || !lineId || !brandName) {
+      return res.status(400).json({
+        message: "Campos incompletos",
+      });
+    }
+
+    // 🔎 VALIDAR LÍNEA
+    const line = await prisma.line.findUnique({
+      where: { id: Number(lineId) },
+    });
+
+    if (!line) {
+      return res.status(400).json({
+        message: "Línea inválida",
+      });
+    }
+
+    // 🔎 VALIDAR MARCA
+    const brands = (line.brands as string[]) || [];
+
+    const isValidBrand = brands.some(
+      (b) => b.toLowerCase().trim() === brandName.toLowerCase().trim()
+    );
+
+    if (!isValidBrand) {
+      return res.status(400).json({
+        message: "Marca inválida",
+      });
+    }
+
+    const updated = await updateProductRepo(id, {
+      name,
+      description,
+      barcode,
+      imageUrl,
+      price: Number(price),
+      finalPrice: Number(finalPrice),
+      lineId: Number(lineId),
+      brandName: brandName.trim(),
+      stock: stock != null ? Number(stock) : undefined,
+      locationId: locationId ? Number(locationId) : undefined,
+    });
 
     return res.json(updated);
   } catch (error) {
-    return res.status(500).json({ message: "No se pudo actualizar el producto" });
+    console.error(error);
+
+    return res.status(500).json({
+      message: "No se pudo actualizar el producto",
+    });
   }
 };
 
-// DELETE (soft delete)
+// DELETE
 export const deleteProduct = async (req: Request, res: Response) => {
   try {
     const id = Number(req.params.id);

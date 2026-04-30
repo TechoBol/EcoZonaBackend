@@ -1,3 +1,5 @@
+// This is your Prisma schema file
+
 generator client {
   provider = "prisma-client-js"
 }
@@ -72,6 +74,19 @@ model Role {
 }
 
 //////////////////////
+// 🏷️ CATEGORIZACIÓN
+//////////////////////
+
+model Line {
+  id          Int       @id @default(autoincrement())
+  name        String    @unique
+  description String?
+  brands      Json      @default("[]")
+  isVisible   Boolean   @default(true)
+  products    Product[]
+}
+
+//////////////////////
 // 📦 PRODUCTOS
 //////////////////////
 
@@ -85,10 +100,17 @@ model Product {
   finalPrice  Float
   isVisible   Boolean @default(true)
 
-  inventories Inventory[]
-  movements   StockMovement[]
-  saleDetails SaleDetail[]
+  // --- Relación con Línea ---
+  line   Line? @relation(fields: [lineId], references: [id])
+  lineId Int?
 
+  // Nombre de la marca seleccionada (Texto simple)
+  brandName String?
+  // --------------------------
+
+  inventories   Inventory[]
+  movements     StockMovement[]
+  saleDetails   SaleDetail[]
   transferItems TransferItem[]
 }
 
@@ -197,12 +219,10 @@ enum TransferStatus {
 //////////////////////
 
 model Sale {
-  id   Int      @id @default(autoincrement())
-  date DateTime @default(now())
-
+  id         Int      @id @default(autoincrement())
+  date       DateTime @default(now())
   location   Location @relation(fields: [locationId], references: [id])
   locationId Int
-
   employee   Employee @relation(fields: [employeeId], references: [id])
   employeeId Int
 
@@ -218,14 +238,11 @@ model Sale {
 }
 
 model SaleDetail {
-  id Int @id @default(autoincrement())
-
-  sale   Sale @relation(fields: [saleId], references: [id])
-  saleId Int
-
+  id        Int     @id @default(autoincrement())
+  sale      Sale    @relation(fields: [saleId], references: [id])
+  saleId    Int
   product   Product @relation(fields: [productId], references: [id])
   productId Int
-
-  quantity Int
-  price    Float
+  quantity  Int
+  price     Float
 }
