@@ -27,27 +27,6 @@ export const createLinesRepo = async (data: any) => {
   });
 };
 
-export const updateLinesRepo = async (id: number, data: any) => {
-  const exists = await prisma.line.findFirst({
-    where: {
-      name: data.name,
-      id: { not: id },
-    },
-  });
-
-  if (exists) {
-    throw new Error("Ya existe una línea con ese nombre");
-  }
-
-  return prisma.line.update({
-    where: { id },
-    data: {
-      name: data.name,
-      description: data.description,
-    },
-  });
-};
-
 export const deleteLinesRepo = async (id: number) => {
   return prisma.line.update({
     where: { id },
@@ -55,63 +34,26 @@ export const deleteLinesRepo = async (id: number) => {
   });
 };
 
-// --- BRANDS ---
-
-export const addBrandRepo = async (id: number, brandName: string) => {
-  const line = await prisma.line.findUnique({ where: { id } });
-  if (!line) throw new Error("Línea no encontrada");
-
-  const brands = line.brands as string[];
-
-  if (brands.includes(brandName)) {
-    throw new Error("La marca ya existe en esta línea");
-  }
-
-  return prisma.line.update({
-    where: { id },
-    data: { brands: [...brands, brandName] },
-  });
-};
-
-export const updateBrandRepo = async (
+export const updateLineRepo = async (
   id: number,
-  oldName: string,
-  newName: string
+  name: string,
+  brands: string[]
 ) => {
   const line = await prisma.line.findUnique({ where: { id } });
+
   if (!line) throw new Error("Línea no encontrada");
 
-  const brands = line.brands as string[];
-
-  if (!brands.includes(oldName)) {
-    throw new Error("La marca no existe en esta línea");
+  // validar duplicados en brands
+  const uniqueBrands = [...new Set(brands)];
+  if (uniqueBrands.length !== brands.length) {
+    throw new Error("No se permiten marcas duplicadas");
   }
-  if (brands.includes(newName)) {
-    throw new Error("Ya existe una marca con ese nombre");
-  }
-
-  const updatedBrands = brands.map((b) => (b === oldName ? newName : b));
 
   return prisma.line.update({
     where: { id },
-    data: { brands: updatedBrands },
-  });
-};
-
-export const deleteBrandRepo = async (id: number, brandName: string) => {
-  const line = await prisma.line.findUnique({ where: { id } });
-  if (!line) throw new Error("Línea no encontrada");
-
-  const brands = line.brands as string[];
-
-  if (!brands.includes(brandName)) {
-    throw new Error("La marca no existe en esta línea");
-  }
-
-  const updatedBrands = brands.filter((b) => b !== brandName);
-
-  return prisma.line.update({
-    where: { id },
-    data: { brands: updatedBrands },
+    data: {
+      name,
+      brands,
+    },
   });
 };
