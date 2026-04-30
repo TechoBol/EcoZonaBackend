@@ -11,7 +11,7 @@ import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 
 //////////////////////////////
-// 🔥 GET ALL
+// GET ALL
 //////////////////////////////
 export const getEmployees = async (req: Request, res: Response) => {
   try {
@@ -28,29 +28,29 @@ export const getEmployees = async (req: Request, res: Response) => {
     return res.json(data);
   } catch (error) {
     console.error(error);
-    return res.status(500).json({ message: "error getting employees" });
+    return res.status(500).json({ message: "Error al cargar los empleados." });
   }
 };
 
 //////////////////////////////
-// 🔥 CREATE
+// CREATE
 //////////////////////////////
 export const createEmployee = async (req: Request, res: Response) => {
   try {
     const { name, lastName, email, password, roleId, locationId } = req.body;
 
-    // 🔥 VALIDACIÓN BÁSICA
+    // VALIDACIÓN BÁSICA
     if (!name || !lastName || !roleId) {
       return res.status(400).json({
-        message: "name, lastName y roleId son obligatorios",
+        message: "Debes completar nombre, apellido y rol",
       });
     }
 
-    // 🔐 CIFRAR PASSWORD
+    // CIFRAR PASSWORD
     let hashedPassword = null;
 
     if (password) {
-      const saltRounds = 10; // puedes subirlo a 12 si quieres más seguridad
+      const saltRounds = 10;
       hashedPassword = await bcrypt.hash(password, saltRounds);
     }
 
@@ -58,7 +58,7 @@ export const createEmployee = async (req: Request, res: Response) => {
       name,
       lastName,
       email,
-      password: hashedPassword, // 👈 aquí mandas el hash, NO el password original
+      password: hashedPassword,
       roleId,
       locationId,
     });
@@ -69,16 +69,16 @@ export const createEmployee = async (req: Request, res: Response) => {
 
     if (error.code === "P2002") {
       return res.status(400).json({
-        message: "El email ya está registrado",
+        message: "Este correo ya está registrado",
       });
     }
 
-    return res.status(500).json({ message: "error creating employee" });
+    return res.status(500).json({ message: "No se pudo crear el empleado" });
   }
 };
 
 //////////////////////////////
-// 🔥 UPDATE
+// UPDATE
 //////////////////////////////
 export const updateEmployee = async (req: Request, res: Response) => {
   try {
@@ -102,7 +102,7 @@ export const updateEmployee = async (req: Request, res: Response) => {
       email,
       roleId,
       locationId,
-      ...(hashedPassword && { password: hashedPassword }), // 🔥 clave
+      ...(hashedPassword && { password: hashedPassword }),
     });
 
     return res.json(data);
@@ -111,16 +111,16 @@ export const updateEmployee = async (req: Request, res: Response) => {
 
     if (error.code === "P2002") {
       return res.status(400).json({
-        message: "El email ya está en uso",
+        message: "Este correo ya está registrado",
       });
     }
 
-    return res.status(500).json({ message: "error updating employee" });
+    return res.status(500).json({ message: "No se puedo actualizar la información del empleado" });
   }
 };
 
 //////////////////////////////
-// 🔥 DELETE (SOFT DELETE)
+// DELETE (SOFT DELETE)
 //////////////////////////////
 export const deleteEmployee = async (req: Request, res: Response) => {
   try {
@@ -138,12 +138,12 @@ export const deleteEmployee = async (req: Request, res: Response) => {
     });
   } catch (error) {
     console.error(error);
-    return res.status(500).json({ message: "error deleting employee" });
+    return res.status(500).json({ message: "No se pudo eliminar el empleado" });
   }
 };
 
 //////////////////////////////
-// 🔥 LOGIN VALIDATION (opcional)
+// LOGIN VALIDATION (opcional)
 //////////////////////////////
 export const validateEmployee = async (req: Request, res: Response) => {
   try {
@@ -151,7 +151,7 @@ export const validateEmployee = async (req: Request, res: Response) => {
 
     if (!id || !password) {
       return res.status(400).json({
-        message: "id y password son requeridos",
+        message: "Ingresa tu correo y contraseña",
       });
     }
 
@@ -159,19 +159,19 @@ export const validateEmployee = async (req: Request, res: Response) => {
 
     if (!data) {
       return res.status(401).json({
-        message: "credenciales inválidas",
+        message: "Usuario o contraseña incorrectos",
       });
     }
 
     return res.json(data);
   } catch (error) {
     console.error(error);
-    return res.status(500).json({ message: "error validating employee" });
+    return res.status(500).json({ message: "Ocurrió un error al validar el empleado" });
   }
 };
 
 //////////////////////////////
-// 🔥 CHANGE PASSWORD
+// CHANGE PASSWORD
 //////////////////////////////
 export const changePassword = async (req: Request, res: Response) => {
   try {
@@ -180,7 +180,7 @@ export const changePassword = async (req: Request, res: Response) => {
 
     if (!id || !newPassword) {
       return res.status(400).json({
-        message: "id y newPassword son requeridos",
+        message: "Correo y nueva contraseña son obligatorios",
       });
     }
 
@@ -192,6 +192,6 @@ export const changePassword = async (req: Request, res: Response) => {
     });
   } catch (error) {
     console.error(error);
-    return res.status(500).json({ message: "error changing password" });
+    return res.status(500).json({ message: "Ocurrió un error al cambiar la contraseña" });
   }
 };

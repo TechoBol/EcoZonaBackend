@@ -4,6 +4,9 @@ import { config } from 'dotenv'
 import http from 'http'
 import { Server as SocketServer } from 'socket.io'
 import intentorySocketInstance from './sockets/inventory.sockets'
+import locationSocketInstance from './sockets/sucursal.sockets'
+import employeeSocketInstance from './sockets/trbajador.sockets'
+import rolSocketInstance from './sockets/roles.sockets'
 
 config()
 
@@ -16,6 +19,9 @@ const io = new SocketServer(server, {
   }
 })
 intentorySocketInstance(io)
+locationSocketInstance(io)
+employeeSocketInstance(io)
+rolSocketInstance(io)
 
 io.on('connection', socket => {
   console.log('a user connected ' + socket.id)
