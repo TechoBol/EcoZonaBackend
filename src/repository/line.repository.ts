@@ -8,6 +8,16 @@ export const getLinesRepo = async () => {
 };
 
 export const createLinesRepo = async (data: any) => {
+  const exists = await prisma.line.findFirst({
+    where: {
+      name: data.name,
+    },
+  });
+
+  if (exists) {
+    throw new Error("Ya existe una línea con ese nombre");
+  }
+
   return prisma.line.create({
     data: {
       name: data.name,
@@ -18,6 +28,17 @@ export const createLinesRepo = async (data: any) => {
 };
 
 export const updateLinesRepo = async (id: number, data: any) => {
+  const exists = await prisma.line.findFirst({
+    where: {
+      name: data.name,
+      id: { not: id },
+    },
+  });
+
+  if (exists) {
+    throw new Error("Ya existe una línea con ese nombre");
+  }
+
   return prisma.line.update({
     where: { id },
     data: {
