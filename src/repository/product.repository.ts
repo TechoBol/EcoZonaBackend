@@ -7,6 +7,8 @@ type CreateProductDTO = {
   imageUrl?: string;
   price: number;
   finalPrice: number;
+  lineId: number;
+  brandName: string;
 };
 
 // 🔥 CREAR PRODUCTO
@@ -16,17 +18,16 @@ export const createProductRepo = async (data: CreateProductDTO) => {
   });
 };
 
-// 🔥 OBTENER TODOS
-// ✅ así debe estar la firma
+// 🔥 GET ALL
 export const getProductsRepo = async (
   locationId: number,
-  isManagement: boolean,
+  isManagement: boolean
 ) => {
-  // 🔥 GERENCIA: trae inventarios de todas las sucursales con su info
   if (isManagement) {
     const products = await prisma.product.findMany({
       where: { isVisible: true },
       include: {
+        line: true,
         inventories: {
           include: {
             location: {
@@ -41,7 +42,10 @@ export const getProductsRepo = async (
       .map((p) => ({
         ...p,
         inventories: undefined,
-        stockTotal: p.inventories.reduce((acc, inv) => acc + inv.quantity, 0),
+        stockTotal: p.inventories.reduce(
+          (acc, inv) => acc + inv.quantity,
+          0
+        ),
         stockBySucursal: p.inventories.map((inv) => ({
           locationId: inv.locationId,
           locationName: inv.location.name,
@@ -51,10 +55,10 @@ export const getProductsRepo = async (
       .sort((a, b) => b.stockTotal - a.stockTotal);
   }
 
-  // 🔥 EMPLEADO NORMAL: comportamiento original sin tocar nada
   const products = await prisma.product.findMany({
     where: { isVisible: true },
     include: {
+      line: true,
       inventories: {
         where: { locationId },
       },
@@ -68,21 +72,21 @@ export const getProductsRepo = async (
   });
 };
 
-// 🔥 OBTENER UNO
+// 🔥 GET ONE
 export const getProductByIdRepo = async (id: number) => {
   return prisma.product.findUnique({
     where: { id },
     include: {
+      line: true,
       inventories: true,
     },
   });
 };
 
-// 🔥 ACTUALIZAR
+// 🔥 UPDATE
 export const updateProductRepo = async (id: number, data: any) => {
   const { stock, locationId, ...productData } = data;
 
-  // 1. actualizar producto
   await prisma.product.update({
     where: { id },
     data: {
@@ -92,10 +96,11 @@ export const updateProductRepo = async (id: number, data: any) => {
       price: productData.price,
       finalPrice: productData.finalPrice,
       imageUrl: productData.imageUrl,
+      lineId: productData.lineId,
+      brandName: productData.brandName,
     },
   });
 
-  // 2. actualizar inventario
   if (stock !== undefined && locationId) {
     await prisma.inventory.upsert({
       where: {
@@ -115,22 +120,20 @@ export const updateProductRepo = async (id: number, data: any) => {
     });
   }
 
-  // 3. devolver producto COMPLETO con inventario
-  const updatedProduct = await prisma.product.findUnique({
+  return prisma.product.findUnique({
     where: { id },
     include: {
+      line: true,
       inventories: {
         include: {
-          location: true, // opcional pero útil
+          location: true,
         },
       },
     },
   });
-
-  return updatedProduct;
 };
 
-// 🔥 DELETE LÓGICO
+// 🔥 DELETE
 export const deleteProductRepo = async (id: number) => {
   return prisma.product.update({
     where: { id },

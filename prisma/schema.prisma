@@ -1,3 +1,5 @@
+// This is your Prisma schema file
+
 generator client {
   provider = "prisma-client-js"
 }
@@ -18,8 +20,8 @@ model Location {
   address   String?
   isVisible Boolean      @default(true)
 
-  abbreviation String? // 🔥 EJ: CBBA, LPZ
-  saleCounter  Int?    @default(0) // 🔥 contador de ventas
+  abbreviation String?
+  saleCounter  Int?    @default(0)
 
   employees   Employee[]
   inventories Inventory[]
@@ -27,6 +29,9 @@ model Location {
 
   fromMovements StockMovement[] @relation("FromLocation")
   toMovements   StockMovement[] @relation("ToLocation")
+
+  fromTransfers Transfer[] @relation("FromTransfer")
+  toTransfers   Transfer[] @relation("ToTransfer")
 }
 
 enum LocationType {
@@ -54,6 +59,9 @@ model Employee {
   sales Sale[]
 
   isVisible Boolean @default(true)
+
+  requestedTransfers Transfer[] @relation("RequestedBy")
+  approvedTransfers  Transfer[] @relation("ApprovedBy")
 }
 
 model Role {
@@ -63,6 +71,19 @@ model Role {
   employee            Employee[]
   isVisible           Boolean    @default(true)
   maxEmployeesAllowed Int        @default(1)
+}
+
+//////////////////////
+// 🏷️ CATEGORIZACIÓN
+//////////////////////
+
+model Line {
+  id          Int       @id @default(autoincrement())
+  name        String    @unique
+  description String?
+  brands      Json      @default("[]")
+  isVisible   Boolean   @default(true)
+  products    Product[]
 }
 
 //////////////////////
@@ -79,9 +100,18 @@ model Product {
   finalPrice  Float
   isVisible   Boolean @default(true)
 
-  inventories Inventory[]
-  movements   StockMovement[]
-  saleDetails SaleDetail[]
+  // --- Relación con Línea ---
+  line   Line? @relation(fields: [lineId], references: [id])
+  lineId Int?
+
+  // Nombre de la marca seleccionada (Texto simple)
+  brandName String?
+  // --------------------------
+
+  inventories   Inventory[]
+  movements     StockMovement[]
+  saleDetails   SaleDetail[]
+  transferItems TransferItem[]
 }
 
 //////////////////////
@@ -103,7 +133,7 @@ model Inventory {
 }
 
 //////////////////////
-// 🔄 MOVIMIENTOS DE STOCK
+// 🔄 MOVIMIENTOS
 //////////////////////
 
 model StockMovement {
@@ -131,23 +161,75 @@ enum MovementType {
 }
 
 //////////////////////
+// 🔥 TRANSFERENCIAS (AJUSTADO)
+//////////////////////
+
+model Transfer {
+  id             Int       @id @default(autoincrement())
+  transferCode   String?
+  // 🔥 AHORA OPCIONALES (CLAVE DEL CAMBIO)
+  fromLocation   Location? @relation("FromTransfer", fields: [fromLocationId], references: [id])
+  fromLocationId Int?
+
+  toLocation   Location? @relation("ToTransfer", fields: [toLocationId], references: [id])
+  toLocationId Int?
+
+  status TransferStatus @default(PENDING)
+
+  createdAt DateTime @default(now())
+
+  requestedById Int
+  requestedBy   Employee @relation("RequestedBy", fields: [requestedById], references: [id])
+
+  approvedById Int?
+  approvedBy   Employee? @relation("ApprovedBy", fields: [approvedById], references: [id])
+
+  approvedAt DateTime?
+  executedAt DateTime?
+
+  // 🔥 OPCIONAL (RECOMENDADO)
+  rejectionReason String?
+
+  items TransferItem[]
+
+  @@index([fromLocationId])
+  @@index([status])
+}
+
+model TransferItem {
+  id Int @id @default(autoincrement())
+
+  transfer   Transfer @relation(fields: [transferId], references: [id])
+  transferId Int
+
+  product   Product @relation(fields: [productId], references: [id])
+  productId Int
+
+  quantity Int
+}
+
+enum TransferStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+//////////////////////
 // 💰 VENTAS
 //////////////////////
 
 model Sale {
-  id   Int      @id @default(autoincrement())
-  date DateTime @default(now())
-
+  id         Int      @id @default(autoincrement())
+  date       DateTime @default(now())
   location   Location @relation(fields: [locationId], references: [id])
   locationId Int
-
   employee   Employee @relation(fields: [employeeId], references: [id])
   employeeId Int
 
   total Float
 
-  code   String? // 🔥 CBBA-1
-  pdfUrl String? // 🔥 ruta S3
+  code   String?
+  pdfUrl String?
 
   details SaleDetail[]
 
@@ -156,14 +238,11 @@ model Sale {
 }
 
 model SaleDetail {
-  id Int @id @default(autoincrement())
-
-  sale   Sale @relation(fields: [saleId], references: [id])
-  saleId Int
-
+  id        Int     @id @default(autoincrement())
+  sale      Sale    @relation(fields: [saleId], references: [id])
+  saleId    Int
   product   Product @relation(fields: [productId], references: [id])
   productId Int
-
-  quantity Int
-  price    Float
+  quantity  Int
+  price     Float
 }
