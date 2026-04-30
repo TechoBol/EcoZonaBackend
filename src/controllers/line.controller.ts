@@ -15,20 +15,26 @@ export const getLines = async (_: Request, res: Response) => {
 };
 
 export const createLines = async (req: Request, res: Response) => {
-  const { name, description, brands } = req.body;
-
-  if (!name) {
-    return res.status(400).json({ message: "El nombre es obligatorio" });
+  try {
+    const data = await createLinesRepo(req.body);
+    return res.json(data);
+  } catch (error: any) {
+    return res.status(400).json({
+      message: error.message,
+    });
   }
-
-  const data = await createLinesRepo({ name, description, brands });
-  return res.json(data);
 };
 
 export const updateLines = async (req: Request, res: Response) => {
   const id = Number(req.params.id);
-  const data = await updateLinesRepo(id, req.body);
-  return res.json(data);
+  try {
+    const data = await updateLinesRepo(id, req.body);
+    return res.json(data);
+  } catch (error: any) {
+    return res.status(400).json({
+      message: error.message,
+    });
+  }
 };
 
 export const deleteLines = async (req: Request, res: Response) => {
