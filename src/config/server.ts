@@ -8,6 +8,7 @@ import saleRoute from '../routes/sale.routes'
 import locationRoute from '../routes/location.routes'
 import employeeRoute from '../routes/employee.routes'
 import roleRoute from '../routes/role.routes'
+import lineRoute from '../routes/line.routes'
 
 import { verifyToken } from '../middleware/auth.middleware'
 
@@ -25,5 +26,6 @@ app.use('/api/sale',verifyToken, saleRoute)
 app.use('/api/location',verifyToken, locationRoute)
 app.use('/api/employee',verifyToken, employeeRoute)
 app.use('/api/role',verifyToken, roleRoute)
+app.use('/api/line',verifyToken, lineRoute)
 
 export default app
