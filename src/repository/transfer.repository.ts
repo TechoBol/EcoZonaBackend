@@ -61,7 +61,7 @@ export const getTransfersByLocationRepo = async () => {
           email: true,
           role: {
             select: {
-              name: true
+              name: true,
             },
           },
         },
@@ -203,7 +203,18 @@ export const approveTransferRepo = async (
         approvedAt: new Date(),
         executedAt: new Date(),
         fromLocationId,
-        toLocationId, // 🔥 automático
+        toLocationId,
+      },
+      include: {
+        fromLocation: true,
+        toLocation: true,
+        requestedBy: true,
+        approvedBy: true,
+        items: {
+          include: {
+            product: true,
+          },
+        },
       },
     });
   });
