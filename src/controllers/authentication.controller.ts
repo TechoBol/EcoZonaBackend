@@ -24,6 +24,7 @@ export const signIn = async (req: Request, res: Response) => {
         role: {
           select: {
             name: true,
+            level: true
           },
         },
         location: {
@@ -52,17 +53,19 @@ export const signIn = async (req: Request, res: Response) => {
         id: employee.id,
         email: employee.email,
         role: employee.role?.name,
+        level: employee.role?.level,
         locationId: employee.location ? employee.location.id : null,
       },
       process.env.JWTSECRET as string,
     );
-
+    
     return res.json({
       id: employee.id,
       name: employee.name,
       lastName: employee.lastName,
       email: employee.email,
       role: employee.role?.name,
+      level: employee.role?.level,
       location: employee.location,
       token,
     });
