@@ -121,7 +121,7 @@ export const approveTransferRepo = async (
     ////////////////////////////////////////
     // 🔥 DESTINO AUTOMÁTICO
     ////////////////////////////////////////
-    const toLocationId = transfer.requestedBy.locationId;
+    const toLocationId = transfer.toLocationId;
 
     if (!toLocationId) {
       throw new Error("El usuario no tiene sucursal asignada");
