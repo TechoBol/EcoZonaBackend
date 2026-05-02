@@ -54,7 +54,7 @@ export const createProduct = async (req: Request, res: Response) => {
     const brands = (line.brands as string[]) || [];
 
     const isValidBrand = brands.some(
-      (b) => b.toLowerCase().trim() === brandName.toLowerCase().trim()
+      (b) => b.toLowerCase().trim() === brandName.toLowerCase().trim(),
     );
 
     if (!isValidBrand) {
@@ -110,14 +110,11 @@ export const getProducts = async (req: Request, res: Response) => {
     const token = req.headers["x-access-token"] as string;
     const user = jwt.verify(token, process.env.JWTSECRET!) as any;
 
-    const isManagement =
-      user.role.includes("Gerente") ||
-      user.role.includes("Subgerente") ||
-      user.role.includes("Jefe");
+    const isManagement = user.level === 1 || user.level === 4;
 
     const products = await getProductsRepo(
       Number(user.locationId),
-      isManagement
+      isManagement,
     );
 
     return res.json(products);
@@ -184,7 +181,7 @@ export const updateProduct = async (req: Request, res: Response) => {
     const brands = (line.brands as string[]) || [];
 
     const isValidBrand = brands.some(
-      (b) => b.toLowerCase().trim() === brandName.toLowerCase().trim()
+      (b) => b.toLowerCase().trim() === brandName.toLowerCase().trim(),
     );
 
     if (!isValidBrand) {

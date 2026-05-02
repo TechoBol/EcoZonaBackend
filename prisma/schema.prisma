@@ -71,6 +71,7 @@ model Role {
   employee            Employee[]
   isVisible           Boolean    @default(true)
   maxEmployeesAllowed Int        @default(1)
+  level               Int?
 }
 
 //////////////////////

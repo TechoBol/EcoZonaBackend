@@ -48,9 +48,52 @@ export const createTransferRepo = async (data: {
 export const getTransfersByLocationRepo = async () => {
   return prisma.transfer.findMany({
     include: {
+      // 📍 LOCATIONS
+      fromLocation: true,
       toLocation: true,
-      items: { include: { product: true } },
+
+      // 👤 QUIÉN SOLICITA
+      requestedBy: {
+        select: {
+          id: true,
+          name: true,
+          lastName: true,
+          email: true,
+          role: {
+            select: {
+              name: true
+            },
+          },
+        },
+      },
+
+      // 👤 QUIÉN APRUEBA
+      approvedBy: {
+        select: {
+          id: true,
+          name: true,
+          lastName: true,
+          email: true,
+          role: {
+            select: {
+              name: true,
+            },
+          },
+        },
+      },
+
+      // 📦 ITEMS
+      items: {
+        include: {
+          product: {
+            include: {
+              line: true, // 👈 si quieres la línea también
+            },
+          },
+        },
+      },
     },
+
     orderBy: { createdAt: "desc" },
   });
 };
@@ -78,7 +121,7 @@ export const approveTransferRepo = async (
     ////////////////////////////////////////
     // 🔥 DESTINO AUTOMÁTICO
     ////////////////////////////////////////
-    const toLocationId = transfer.requestedBy.locationId;
+    const toLocationId = transfer.toLocationId;
 
     if (!toLocationId) {
       throw new Error("El usuario no tiene sucursal asignada");

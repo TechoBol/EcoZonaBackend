@@ -125,6 +125,7 @@ export const updateProductRepo = async (id: number, data: any) => {
     include: {
       line: true,
       inventories: {
+        where: { locationId },
         include: {
           location: true,
         },

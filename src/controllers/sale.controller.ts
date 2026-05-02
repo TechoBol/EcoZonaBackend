@@ -117,10 +117,7 @@ export const getSales = async (req: Request, res: Response) => {
     const token = req.headers["x-access-token"] as string;
     const user = jwt.verify(token, process.env.JWTSECRET!) as any;
 
-    const isManagement =
-      user.role.includes("Gerente") ||
-      user.role.includes("Subgerente") ||
-      user.role.includes("Jefe");
+    const isManagement = user.level === 1 || user.level === 4;
 
     const data = await getSalesRepo(Number(user.locationId), isManagement);
 
