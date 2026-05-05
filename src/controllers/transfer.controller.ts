@@ -21,9 +21,10 @@
       const data = await createTransferRepo({
         requestedById: user.id,
         toLocationId: destinationId? destinationId : user.locationId,
+        fromLocationID : destinationId? 1 : undefined,
         items,
       });
-
+      destinationId? approveTransferRepo(data.id, user.id, 1) : null;
       return res.json(data);
     } catch (error) {
       return res.status(500).json({ message: "error creating request" });
