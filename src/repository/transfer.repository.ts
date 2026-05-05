@@ -3,6 +3,7 @@ import prisma from "../config/db";
 export const createTransferRepo = async (data: {
   requestedById: number;
   toLocationId: number;
+  fromLocationID?: number;
   items: { productId: number; quantity: number }[];
 }) => {
   return await prisma.$transaction(async (tx) => {
@@ -36,6 +37,7 @@ export const createTransferRepo = async (data: {
         items: {
           create: data.items,
         },
+        fromLocationId: data.fromLocationID,
       },
       include: {
         toLocation: true,
@@ -103,6 +105,7 @@ export const approveTransferRepo = async (
   approvedById: number,
   fromLocationId: number,
 ) => {
+  console.log("entra")
   return prisma.$transaction(async (tx) => {
     const transfer = await tx.transfer.findUnique({
       where: { id: transferId },
