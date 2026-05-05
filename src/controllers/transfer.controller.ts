@@ -12,7 +12,7 @@
       const token = req.headers["x-access-token"] as string;
       const user = jwt.verify(token, process.env.JWTSECRET!) as any;
 
-      const { items } = req.body;
+      const { destinationId ,items } = req.body;
 
       if (!items?.length) {
         return res.status(400).json({ message: "Items requeridos" });
@@ -20,7 +20,7 @@
 
       const data = await createTransferRepo({
         requestedById: user.id,
-        toLocationId: user.locationId,
+        toLocationId: destinationId? destinationId : user.locationId,
         items,
       });
 
