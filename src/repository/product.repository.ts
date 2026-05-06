@@ -41,12 +41,11 @@ export const getProductsRepo = async (
     return products
       .map((p) => ({
         ...p,
-        inventories: undefined,
         stockTotal: p.inventories.reduce(
           (acc, inv) => acc + inv.quantity,
           0
         ),
-        stockBySucursal: p.inventories.map((inv) => ({
+        inventories: p.inventories.map((inv) => ({
           locationId: inv.locationId,
           locationName: inv.location.name,
           quantity: inv.quantity,
@@ -72,7 +71,7 @@ export const getProductsRepo = async (
   });
 };
 
-// 🔥 GET ONE
+
 export const getProductByIdRepo = async (id: number) => {
   return prisma.product.findUnique({
     where: { id },
