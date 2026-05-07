@@ -130,6 +130,8 @@ model Inventory {
 
   quantity Int @default(0)
 
+  averageCost Float @default(0)
+
   @@unique([productId, locationId])
 }
 
@@ -150,9 +152,17 @@ model StockMovement {
   toLocationId Int?
 
   quantity Int
-  type     MovementType
 
-  createdAt DateTime @default(now())
+  type MovementType
+
+  // 🔥 NUEVO
+  unitCost Float @default(0)
+
+  // 🔥 OPCIONAL
+  reference  String?
+  transfer   Transfer? @relation(fields: [transferId], references: [id])
+  transferId Int?
+  createdAt  DateTime  @default(now())
 }
 
 enum MovementType {
@@ -191,7 +201,8 @@ model Transfer {
   // 🔥 OPCIONAL (RECOMENDADO)
   rejectionReason String?
 
-  items TransferItem[]
+  items     TransferItem[]
+  movements StockMovement[]
 
   @@index([fromLocationId])
   @@index([status])

@@ -7,41 +7,76 @@ export const createTransferRepo = async (data: {
   items: { productId: number; quantity: number }[];
 }) => {
   return await prisma.$transaction(async (tx) => {
-    // 1. Obtener la location
+    ////////////////////////////////////////
+    // 🔥 LOCATION DESTINO
+    ////////////////////////////////////////
+
     const location = await tx.location.findUnique({
       where: { id: data.toLocationId },
-      select: { id: true, name: true, abbreviation: true }, // usa el campo que tengas
+      select: {
+        id: true,
+        name: true,
+        abbreviation: true,
+      },
     });
 
     if (!location) {
       throw new Error("Location no encontrada");
     }
 
-    // 2. Contar transferencias de esa location
+    ////////////////////////////////////////
+    // 🔥 CONTADOR
+    ////////////////////////////////////////
+
     const count = await tx.transfer.count({
       where: {
         toLocationId: data.toLocationId,
       },
     });
 
-    // 3. Generar código
+    ////////////////////////////////////////
+    // 🔥 CODIGO TRANSFERENCIA
+    ////////////////////////////////////////
+
     const transferCode = `TR-${location.abbreviation}-${count + 1}`;
 
-    // 4. Crear transferencia
+    ////////////////////////////////////////
+    // 🔥 CREAR TRANSFERENCIA
+    ////////////////////////////////////////
+
     return await tx.transfer.create({
       data: {
         transferCode,
+
         requestedById: data.requestedById,
+
         toLocationId: data.toLocationId,
+
+        fromLocationId: data.fromLocationID,
+
         status: "PENDING",
+
         items: {
           create: data.items,
         },
-        fromLocationId: data.fromLocationID,
       },
+
       include: {
+        fromLocation: true,
+
         toLocation: true,
-        items: { include: { product: true } },
+
+        requestedBy: true,
+
+        items: {
+          include: {
+            product: {
+              include: {
+                line: true,
+              },
+            },
+          },
+        },
       },
     });
   });
@@ -50,17 +85,25 @@ export const createTransferRepo = async (data: {
 export const getTransfersByLocationRepo = async () => {
   return prisma.transfer.findMany({
     include: {
-      // 📍 LOCATIONS
+      ////////////////////////////////////////
+      // 🔥 LOCATIONS
+      ////////////////////////////////////////
+
       fromLocation: true,
+
       toLocation: true,
 
-      // 👤 QUIÉN SOLICITA
+      ////////////////////////////////////////
+      // 🔥 SOLICITANTE
+      ////////////////////////////////////////
+
       requestedBy: {
         select: {
           id: true,
           name: true,
           lastName: true,
           email: true,
+
           role: {
             select: {
               name: true,
@@ -69,13 +112,17 @@ export const getTransfersByLocationRepo = async () => {
         },
       },
 
-      // 👤 QUIÉN APRUEBA
+      ////////////////////////////////////////
+      // 🔥 APROBADOR
+      ////////////////////////////////////////
+
       approvedBy: {
         select: {
           id: true,
           name: true,
           lastName: true,
           email: true,
+
           role: {
             select: {
               name: true,
@@ -84,19 +131,24 @@ export const getTransfersByLocationRepo = async () => {
         },
       },
 
-      // 📦 ITEMS
+      ////////////////////////////////////////
+      // 🔥 ITEMS
+      ////////////////////////////////////////
+
       items: {
         include: {
           product: {
             include: {
-              line: true, // 👈 si quieres la línea también
+              line: true,
             },
           },
         },
       },
     },
 
-    orderBy: { createdAt: "desc" },
+    orderBy: {
+      createdAt: "desc",
+    },
   });
 };
 
@@ -105,36 +157,46 @@ export const approveTransferRepo = async (
   approvedById: number,
   fromLocationId: number,
 ) => {
-  console.log("entra")
   return prisma.$transaction(async (tx) => {
+    ////////////////////////////////////////
+    // 🔥 OBTENER TRANSFERENCIA
+    ////////////////////////////////////////
+
     const transfer = await tx.transfer.findUnique({
-      where: { id: transferId },
+      where: {
+        id: transferId,
+      },
+
       include: {
         items: true,
         requestedBy: true,
       },
     });
 
-    if (!transfer) throw new Error("Transfer no existe");
+    if (!transfer) {
+      throw new Error("Transfer no existe");
+    }
 
     if (transfer.status !== "PENDING") {
       throw new Error("Transfer ya procesada");
     }
 
     ////////////////////////////////////////
-    // 🔥 DESTINO AUTOMÁTICO
+    // 🔥 DESTINO
     ////////////////////////////////////////
+
     const toLocationId = transfer.toLocationId;
 
     if (!toLocationId) {
-      throw new Error("El usuario no tiene sucursal asignada");
+      throw new Error("Location destino inválida");
     }
 
     ////////////////////////////////////////
     // 🔥 VALIDAR STOCK
     ////////////////////////////////////////
+
     for (const item of transfer.items) {
-      const inv = await tx.inventory.findUnique({
+      const inventory = await tx.inventory.findUnique({
         where: {
           productId_locationId: {
             productId: item.productId,
@@ -143,16 +205,45 @@ export const approveTransferRepo = async (
         },
       });
 
-      if (!inv || inv.quantity < item.quantity) {
-        throw new Error("Stock insuficiente");
+      if (!inventory || inventory.quantity < item.quantity) {
+        throw new Error(
+          `Stock insuficiente para producto ${item.productId}`,
+        );
       }
     }
 
     ////////////////////////////////////////
     // 🔥 MOVER STOCK
     ////////////////////////////////////////
+
     for (const item of transfer.items) {
-      // RESTAR
+      ////////////////////////////////////////
+      // 🔥 INVENTARIO ORIGEN
+      ////////////////////////////////////////
+
+      const sourceInventory = await tx.inventory.findUnique({
+        where: {
+          productId_locationId: {
+            productId: item.productId,
+            locationId: fromLocationId,
+          },
+        },
+      });
+
+      if (!sourceInventory) {
+        throw new Error("Inventario origen no encontrado");
+      }
+
+      ////////////////////////////////////////
+      // 🔥 COSTO PROMEDIO ORIGEN
+      ////////////////////////////////////////
+
+      const averageCost = sourceInventory.averageCost || 0;
+
+      ////////////////////////////////////////
+      // 🔥 RESTAR ORIGEN
+      ////////////////////////////////////////
+
       await tx.inventory.update({
         where: {
           productId_locationId: {
@@ -160,59 +251,136 @@ export const approveTransferRepo = async (
             locationId: fromLocationId,
           },
         },
+
         data: {
-          quantity: { decrement: item.quantity },
+          quantity: {
+            decrement: item.quantity,
+          },
         },
       });
 
-      // SUMAR
-      await tx.inventory.upsert({
+      ////////////////////////////////////////
+      // 🔥 INVENTARIO DESTINO
+      ////////////////////////////////////////
+
+      const targetInventory = await tx.inventory.findUnique({
         where: {
           productId_locationId: {
             productId: item.productId,
             locationId: toLocationId,
           },
         },
-        update: {
-          quantity: { increment: item.quantity },
-        },
-        create: {
-          productId: item.productId,
-          locationId: toLocationId,
-          quantity: item.quantity,
-        },
       });
 
-      // MOVIMIENTO
+      ////////////////////////////////////////
+      // 🔥 SI EXISTE DESTINO
+      ////////////////////////////////////////
+
+      if (targetInventory) {
+        const cantidadActual = targetInventory.quantity;
+
+        const costoActual = targetInventory.averageCost;
+
+        const totalActual = cantidadActual * costoActual;
+
+        const totalNuevo = item.quantity * averageCost;
+
+        const nuevaCantidad = cantidadActual + item.quantity;
+
+        const nuevoPromedio =
+          nuevaCantidad > 0
+            ? (totalActual + totalNuevo) / nuevaCantidad
+            : averageCost;
+
+        await tx.inventory.update({
+          where: {
+            productId_locationId: {
+              productId: item.productId,
+              locationId: toLocationId,
+            },
+          },
+
+          data: {
+            quantity: {
+              increment: item.quantity,
+            },
+
+            averageCost: nuevoPromedio,
+          },
+        });
+      } else {
+        ////////////////////////////////////////
+        // 🔥 CREAR INVENTARIO DESTINO
+        ////////////////////////////////////////
+
+        await tx.inventory.create({
+          data: {
+            productId: item.productId,
+
+            locationId: toLocationId,
+
+            quantity: item.quantity,
+
+            averageCost: averageCost,
+          },
+        });
+      }
+
+      ////////////////////////////////////////
+      // 🔥 MOVIMIENTO KARDEX
+      ////////////////////////////////////////
+
       await tx.stockMovement.create({
         data: {
           productId: item.productId,
+
           fromLocationId,
           toLocationId,
+
           quantity: item.quantity,
+
           type: "TRANSFER",
+
+          transferId: transfer.id,
+
+          // 🔥 COSTO HISTORICO REAL
+          unitCost: averageCost,
+
+          reference: transfer.transferCode,
         },
       });
     }
 
     ////////////////////////////////////////
-    // 🔥 ACTUALIZAR TRANSFER
+    // 🔥 ACTUALIZAR TRANSFERENCIA
     ////////////////////////////////////////
-    return tx.transfer.update({
-      where: { id: transferId },
+
+    return await tx.transfer.update({
+      where: {
+        id: transferId,
+      },
+
       data: {
         status: "APPROVED",
+
         approvedById,
+
         approvedAt: new Date(),
+
         executedAt: new Date(),
+
         fromLocationId,
-        toLocationId,
       },
+
       include: {
         fromLocation: true,
+
         toLocation: true,
+
         requestedBy: true,
+
         approvedBy: true,
+
         items: {
           include: {
             product: true,
@@ -228,10 +396,15 @@ export const rejectTransferRepo = async (
   approvedById: number,
 ) => {
   return prisma.transfer.update({
-    where: { id: transferId },
+    where: {
+      id: transferId,
+    },
+
     data: {
       status: "REJECTED",
+
       approvedById,
+
       approvedAt: new Date(),
     },
   });
