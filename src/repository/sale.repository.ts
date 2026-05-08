@@ -97,8 +97,6 @@ export const getSalesRepo = async (
       date: true,
       pdfUrl: true,
       typeSale: true,
-      transactionNumber: true,
-
       location: {
         select: {
           name: true,

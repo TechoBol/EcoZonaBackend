@@ -245,8 +245,10 @@ model Sale {
 
   details SaleDetail[]
 
-  typeSale          String?
-  transactionNumber String?
+  typeSale             String?
+  transactionNumber    String?
+  paymentMethodChanged Boolean? @default(false)
+  dateChanged          Boolean? @default(false)
 }
 
 model SaleDetail {
