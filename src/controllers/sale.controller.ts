@@ -14,17 +14,28 @@ import jwt from "jsonwebtoken";
 
 export const createSale = async (req: Request, res: Response) => {
   try {
-    const { locationId, products, codigoTransaccion, metodoPago, discount } =
-      req.body;
+    const {
+      locationId,
+      products,
+      codigoTransaccion,
+      metodoPago,
+      discount,
+    } = req.body;
+
     const token = req.headers["x-access-token"] as string;
 
-    const user = jwt.verify(token, process.env.JWTSECRET!) as any;
+    const user = jwt.verify(
+      token,
+      process.env.JWTSECRET!,
+    ) as any;
 
     const sale = await prisma.$transaction(
       async (tx) => {
         let total = 0;
 
-        // 1. validar stock
+        // =====================================================
+        // 🔥 VALIDAR STOCK
+        // =====================================================
         for (const item of products) {
           const inventory = await getInventoryRepo(
             tx,
@@ -32,62 +43,153 @@ export const createSale = async (req: Request, res: Response) => {
             locationId,
           );
 
-          if (!inventory || inventory.quantity < item.quantity) {
+          if (
+            !inventory ||
+            inventory.quantity < item.quantity
+          ) {
             throw new Error("insufficient stock");
           }
         }
 
-        // 2. incrementar contador
-        const location = await incrementLocationCounterRepo(tx, locationId);
+        // =====================================================
+        // 🔥 INCREMENTAR CONTADOR
+        // =====================================================
+        const location =
+          await incrementLocationCounterRepo(
+            tx,
+            locationId,
+          );
 
         const saleNumber = location.saleCounter;
+
         const code = `${location.abbreviation}-${saleNumber}`;
 
-        // 3. crear venta
+        // =====================================================
+        // 🔥 CREAR VENTA
+        // =====================================================
         const newSale = await createSaleRepo(tx, {
           employeeId: user.id,
+
           locationId,
+
           total: 0,
+
           code,
+
           pdfUrl: `ECOZONA/SALES/${code}.pdf`,
+
           typeSale: metodoPago,
+
           transactionNumber: codigoTransaccion,
         });
 
-        // 4. detalles + cálculo total
+        // =====================================================
+        // 🔥 DETALLES + INVENTARIO + KARDEX
+        // =====================================================
         for (const item of products) {
-          const product = await getProductRepo(tx, item.productId);
+          const product = await getProductRepo(
+            tx,
+            item.productId,
+          );
 
-          if (!product) throw new Error("product not found");
+          if (!product) {
+            throw new Error("product not found");
+          }
 
+          // ==========================================
+          // 🔥 INVENTARIO ACTUAL
+          // ==========================================
+          const inventory =
+            await tx.inventory.findUnique({
+              where: {
+                productId_locationId: {
+                  productId: item.productId,
+                  locationId,
+                },
+              },
+            });
+
+          if (!inventory) {
+            throw new Error(
+              "inventory not found",
+            );
+          }
+
+          // ==========================================
+          // 🔥 PRECIO VENTA
+          // ==========================================
           const price = product.finalPrice;
 
           total += price * item.quantity;
 
+          // ==========================================
+          // 🔥 DETALLE VENTA
+          // ==========================================
           await createSaleDetailRepo(tx, {
             saleId: newSale.id,
+
             productId: item.productId,
+
             quantity: item.quantity,
+
             price,
           });
 
+          // ==========================================
+          // 🔥 DESCONTAR INVENTARIO
+          // ==========================================
           await updateInventoryRepo(
             tx,
             item.productId,
             locationId,
             item.quantity,
           );
+
+          // ==========================================
+          // 🔥 MOVIMIENTO KARDEX
+          // ==========================================
+          await tx.stockMovement.create({
+            data: {
+              productId: item.productId,
+
+              fromLocationId: locationId,
+
+              quantity: item.quantity,
+
+              type: "OUT",
+
+              // 🔥 COSTO PROMEDIO REAL
+              unitCost:
+                inventory.averageCost ||
+                product.price,
+
+              reference: `VENTA ${code}`,
+            },
+          });
         }
 
-        // 5. actualizar total
-        await updateSaleTotalRepo(tx, newSale.id, total - discount);
+        // =====================================================
+        // 🔥 ACTUALIZAR TOTAL
+        // =====================================================
+        await updateSaleTotalRepo(
+          tx,
+          newSale.id,
+          total - (discount || 0),
+        );
 
-        // 6. traer venta completa
+        // =====================================================
+        // 🔥 OBTENER VENTA COMPLETA
+        // =====================================================
         const fullSale = await tx.sale.findUnique({
-          where: { id: newSale.id },
+          where: {
+            id: newSale.id,
+          },
+
           include: {
             location: true,
+
             employee: true,
+
             details: {
               include: {
                 product: true,
@@ -98,7 +200,9 @@ export const createSale = async (req: Request, res: Response) => {
 
         return fullSale;
       },
-      { timeout: 15000 },
+      {
+        timeout: 15000,
+      },
     );
 
     return res.json({
@@ -106,25 +210,45 @@ export const createSale = async (req: Request, res: Response) => {
       sale,
     });
   } catch (err: any) {
+    console.error("❌ ERROR CREATE SALE:", err);
+
     return res.status(500).json({
-      message: err.message || "No se pudo crear la venta",
+      message:
+        err.message ||
+        "No se pudo crear la venta",
     });
   }
 };
 
-export const getSales = async (req: Request, res: Response) => {
+export const getSales = async (
+  req: Request,
+  res: Response,
+) => {
   try {
-    const token = req.headers["x-access-token"] as string;
-    const user = jwt.verify(token, process.env.JWTSECRET!) as any;
+    const token = req.headers[
+      "x-access-token"
+    ] as string;
 
-    const isManagement = user.level === 1 || user.level === 4;
+    const user = jwt.verify(
+      token,
+      process.env.JWTSECRET!,
+    ) as any;
 
-    const data = await getSalesRepo(Number(user.locationId), isManagement);
+    const isManagement =
+      user.level === 1 || user.level === 4;
+
+    const data = await getSalesRepo(
+      Number(user.locationId),
+      isManagement,
+    );
 
     return res.json(data);
   } catch (error) {
+    console.error("❌ ERROR GET SALES:", error);
+
     return res.status(500).json({
-      message: "No se pudieron obtener las ventas",
+      message:
+        "No se pudieron obtener las ventas",
     });
   }
 };

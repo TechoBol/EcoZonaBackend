@@ -6,6 +6,7 @@ import {
   getProductByIdRepo,
   updateProductRepo,
   deleteProductRepo,
+  getKardexRepo,
 } from "../repository/product.repository";
 import jwt from "jsonwebtoken";
 
@@ -24,7 +25,12 @@ export const createProduct = async (req: Request, res: Response) => {
       brandName,
     } = req.body;
 
-    // 🔎 VALIDACIÓN
+    console.log("📥 CREATE PRODUCT BODY:", req.body);
+
+    // =====================================================
+    // 🔥 VALIDACIONES
+    // =====================================================
+
     if (
       !name ||
       !barcode ||
@@ -39,9 +45,14 @@ export const createProduct = async (req: Request, res: Response) => {
       });
     }
 
-    // 🔎 VALIDAR LÍNEA
+    // =====================================================
+    // 🔥 VALIDAR LÍNEA
+    // =====================================================
+
     const line = await prisma.line.findUnique({
-      where: { id: Number(lineId) },
+      where: {
+        id: Number(lineId),
+      },
     });
 
     if (!line) {
@@ -50,7 +61,10 @@ export const createProduct = async (req: Request, res: Response) => {
       });
     }
 
-    // 🔎 VALIDAR MARCA (STRING[])
+    // =====================================================
+    // 🔥 VALIDAR MARCA
+    // =====================================================
+
     const brands = (line.brands as string[]) || [];
 
     const isValidBrand = brands.some(
@@ -63,13 +77,20 @@ export const createProduct = async (req: Request, res: Response) => {
       });
     }
 
-    // 🔥 CREAR
+    // =====================================================
+    // 🔥 TRANSACCIÓN
+    // =====================================================
+
     const result = await prisma.$transaction(async (tx) => {
+      // =====================================================
+      // 🔥 CREAR PRODUCTO
+      // =====================================================
+
       const product = await tx.product.create({
         data: {
-          name,
+          name: name.trim().toUpperCase(),
           description,
-          barcode,
+          barcode: barcode.trim(),
           imageUrl,
           price: Number(price),
           finalPrice: Number(finalPrice),
@@ -78,20 +99,66 @@ export const createProduct = async (req: Request, res: Response) => {
         },
       });
 
+      console.log("✅ Producto creado:", product.id);
+
+      // =====================================================
+      // 🔥 CREAR INVENTARIO
+      // =====================================================
+
       await tx.inventory.create({
         data: {
           productId: product.id,
           locationId: Number(locationId),
+
           quantity: Number(stock) || 0,
+
+          // 🔥 COSTO PROMEDIO INICIAL
+          averageCost: Number(price),
         },
       });
+
+      console.log("📦 Inventario creado");
+
+      // =====================================================
+      // 🔥 CREAR MOVIMIENTO INICIAL
+      // =====================================================
+
+      if (Number(stock) > 0) {
+        await tx.stockMovement.create({
+          data: {
+            productId: product.id,
+
+            // 🔥 entra al almacén/sucursal
+            toLocationId: Number(locationId),
+
+            quantity: Number(stock),
+
+            // 🔥 movimiento ingreso
+            type: "IN",
+
+            // 🔥 COSTO HISTÓRICO
+            unitCost: Number(price),
+
+            // 🔥 REFERENCIA
+            reference: "STOCK INICIAL",
+          },
+        });
+
+        console.log("🧾 Movimiento inicial creado");
+      }
 
       return product;
     });
 
-    return res.json(result);
+    console.log("🎉 Producto registrado correctamente");
+
+    return res.status(201).json(result);
   } catch (err: any) {
-    console.error(err);
+    console.error("❌ ERROR CREATE PRODUCT:", err);
+
+    // =====================================================
+    // 🔥 PRODUCTO DUPLICADO
+    // =====================================================
 
     if (err.code === "P2002") {
       return res.status(400).json({
@@ -160,6 +227,9 @@ export const updateProduct = async (req: Request, res: Response) => {
       brandName,
     } = req.body;
 
+    // ==========================================
+    // 🔎 VALIDACIONES
+    // ==========================================
     if (!name || !barcode || !lineId || !brandName) {
       return res.status(400).json({
         message: "Campos incompletos",
@@ -190,6 +260,9 @@ export const updateProduct = async (req: Request, res: Response) => {
       });
     }
 
+    // ==========================================
+    // 🔥 UPDATE
+    // ==========================================
     const updated = await updateProductRepo(id, {
       name,
       description,
@@ -199,13 +272,13 @@ export const updateProduct = async (req: Request, res: Response) => {
       finalPrice: Number(finalPrice),
       lineId: Number(lineId),
       brandName: brandName.trim(),
-      stock: stock != null ? Number(stock) : undefined,
+      stock: stock !== undefined && stock !== null ? Number(stock) : undefined,
       locationId: locationId ? Number(locationId) : undefined,
     });
 
     return res.json(updated);
   } catch (error) {
-    console.error(error);
+    console.error("❌ Error updateProduct:", error);
 
     return res.status(500).json({
       message: "No se pudo actualizar el producto",
@@ -223,5 +296,23 @@ export const deleteProduct = async (req: Request, res: Response) => {
     return res.json({ message: "Producto eliminado" });
   } catch {
     return res.status(500).json({ message: "No se pudo eliminar el producto" });
+  }
+};
+
+export const getKardex = async (req: Request, res: Response) => {
+  try {
+    console.log("📥 BODY:", req.body);
+
+    const kardex = await getKardexRepo(req.body);
+
+    console.log("📤 Enviando respuesta...");
+
+    return res.status(200).json(kardex); 
+  } catch (error) {
+    console.error("❌ Error en kardex:", error);
+
+    return res.status(500).json({
+      message: "Error al generar kardex",
+    });
   }
 };
