@@ -128,3 +128,92 @@ export const getSales = async (req: Request, res: Response) => {
     });
   }
 };
+
+export const updateSalePaymentMethod = async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const { typeSale } = req.body;
+
+  try {
+    const sale = await prisma.sale.findUnique({
+      where: { id: Number(id) },
+    });
+
+    if (!sale) return res.status(404).json({ error: "Venta no encontrada" });
+
+    if (sale.paymentMethodChanged) {
+      return res.status(400).json({ error: "El método de pago ya fue cambiado anteriormente" });
+    }
+
+    const updated = await prisma.sale.update({
+      where: { id: Number(id) },
+      data: { typeSale, paymentMethodChanged: true },
+      include: {
+        location: { select: { name: true } },
+        employee: { select: { name: true, lastName: true } },
+        details: {
+          include: {
+            product: {
+              select: { id: true, name: true, barcode: true },
+            },
+          },
+        },
+      },
+    });
+
+    return res.json(updated);
+  } catch (error) {
+    return res.status(500).json({ error: "Error al actualizar el método de pago" });
+  }
+};
+
+export const updateSaleDate = async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const { date } = req.body;
+  try {
+    const sale = await prisma.sale.findUnique({
+      where: { id: Number(id) },
+    });
+
+    if (!sale) {
+      return res.status(404).json({
+        error: "Venta no encontrada",
+      });
+    }
+
+    if (sale.dateChanged) {
+      return res.status(400).json({
+        error: "La fecha ya fue modificada anteriormente",
+      });
+    }
+
+    const parsedDate = new Date(date);
+
+    if (isNaN(parsedDate.getTime())) {
+      return res.status(400).json({
+        error: "Fecha inválida",
+      });
+    }
+
+    const updated = await prisma.sale.update({
+      where: { id: Number(id) },
+      data: { date: parsedDate, dateChanged: true },
+      include: {
+        location: { select: { name: true } },
+        employee: { select: { name: true, lastName: true } },
+        details: {
+          include: {
+            product: {
+              select: { id: true, name: true, barcode: true },
+            },
+          },
+        },
+      },
+    });
+
+    return res.json(updated);
+  } catch (error) {
+    return res.status(500).json({
+      error: "Error al actualizar la fecha",
+    });
+  }
+};
