@@ -85,9 +85,9 @@ export const getSalesRepo = async (
 ) => {
   return prisma.sale.findMany({
     where: isManagement
-      ? {} 
+      ? {}
       : {
-          locationId: locationId, // 🔥 solo su sucursal
+          locationId: locationId,
         },
 
     select: {
@@ -97,15 +97,34 @@ export const getSalesRepo = async (
       date: true,
       pdfUrl: true,
       typeSale: true,
+      transactionNumber: true,
+
       location: {
         select: {
           name: true,
         },
       },
+
       employee: {
         select: {
           name: true,
           lastName: true,
+        },
+      },
+
+      details: {
+        select: {
+          id: true,
+          quantity: true,
+          price: true,
+
+          product: {
+            select: {
+              id: true,
+              name: true,
+              barcode: true,
+            },
+          },
         },
       },
     },

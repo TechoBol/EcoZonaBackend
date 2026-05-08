@@ -254,14 +254,14 @@ export const getKardexRepo = async ({
   toDate,
   locationId,
   linea,
-  marca
+  marca,
 }: {
   productId?: number | null;
   fromDate?: string;
   toDate?: string;
   locationId?: number | null;
-  linea?:number
-  marca?:string;
+  linea?: number;
+  marca?: string;
 }) => {
   console.log("📥 INPUT:", {
     productId,
@@ -301,13 +301,13 @@ export const getKardexRepo = async ({
         lineId: linea,
       }),
 
-       ...(marca &&
-      marca.trim() !== "" && {
-        brandName: {
-          contains: marca,
-          mode: "insensitive",
-        },
-      }),
+      ...(marca &&
+        marca.trim() !== "" && {
+          brandName: {
+            contains: marca,
+            mode: "insensitive",
+          },
+        }),
     },
 
     include: {
@@ -353,6 +353,8 @@ export const getKardexRepo = async ({
       },
 
       transfer: true,
+      fromLocation: true,
+      toLocation: true,
     },
 
     orderBy: {
@@ -381,10 +383,7 @@ export const getKardexRepo = async ({
       },
     });
 
-    const stockActual = inventory.reduce(
-      (acc, inv) => acc + inv.quantity,
-      0,
-    );
+    const stockActual = inventory.reduce((acc, inv) => acc + inv.quantity, 0);
 
     const inventoryCost =
       inventory.length > 0
@@ -401,7 +400,10 @@ export const getKardexRepo = async ({
     for (const mov of movements.filter((m) => m.productId === product.id)) {
       let entrada = 0;
       let salida = 0;
+
       let detalle = "";
+
+      let codigoMovimiento = "";
 
       ////////////////////////////////////////////////////////
       // 🔥 INGRESOS
@@ -410,7 +412,7 @@ export const getKardexRepo = async ({
       if (mov.type === "IN") {
         entrada = mov.quantity;
 
-        detalle = mov.reference || "COMPRA / IMPORTACIÓN";
+        detalle = (mov.reference || "COMPRA / IMPORTACIÓN").toUpperCase();
       }
 
       ////////////////////////////////////////////////////////
@@ -420,7 +422,7 @@ export const getKardexRepo = async ({
       if (mov.type === "OUT") {
         salida = mov.quantity;
 
-        detalle = mov.reference || "SALIDA";
+        detalle = (mov.reference || "SALIDA").toUpperCase();
       }
 
       ////////////////////////////////////////////////////////
@@ -428,42 +430,82 @@ export const getKardexRepo = async ({
       ////////////////////////////////////////////////////////
 
       if (mov.type === "TRANSFER") {
-        const transferCode =
-          mov.transfer?.transferCode || "TRANSFERENCIA";
+        const transferCode = mov.transfer?.transferCode || `TR-${mov.id}`;
+
+        const fromName = mov.fromLocation?.name?.toUpperCase() || "ORIGEN";
+
+        const toName = mov.toLocation?.name?.toUpperCase() || "DESTINO";
+
+        codigoMovimiento = transferCode;
 
         //////////////////////////////////////////////////////
         // 🔥 FILTRANDO POR SUCURSAL
         //////////////////////////////////////////////////////
 
         if (locationId) {
-          ////////////////////////////////////////////////
-          // 🔥 ENTRADA A SUCURSAL
-          ////////////////////////////////////////////////
+          //////////////////////////////////////////////////
+          // 🔥 ENTRADA
+          //////////////////////////////////////////////////
 
           if (mov.toLocationId === locationId) {
             entrada = mov.quantity;
 
-            detalle = `TRANSFERENCIA ENTRADA ${transferCode}`;
+            detalle = (
+              `TRANSFERENCIA ENTRADA ${transferCode} ` +
+              `${fromName} → ${toName}`
+            ).toUpperCase();
           }
 
-          ////////////////////////////////////////////////
-          // 🔥 SALIDA DE SUCURSAL
-          ////////////////////////////////////////////////
+          //////////////////////////////////////////////////
+          // 🔥 SALIDA
+          //////////////////////////////////////////////////
 
           if (mov.fromLocationId === locationId) {
             salida = mov.quantity;
 
-            detalle = `TRANSFERENCIA SALIDA ${transferCode}`;
+            detalle = (
+              `TRANSFERENCIA SALIDA ${transferCode} ` +
+              `${fromName} → ${toName}`
+            ).toUpperCase();
           }
         } else {
           //////////////////////////////////////////////////
-          // 🔥 TODAS LAS SUCURSALES
-          // SOLO MOSTRAR SALIDA PARA EVITAR DUPLICAR
+          // 🔥 GLOBAL
           //////////////////////////////////////////////////
 
-          salida = mov.quantity;
+          movimientosProducto.push({
+            fecha: mov.createdAt,
 
-          detalle = `TRANSFERENCIA SALIDA ${transferCode}`;
+            codigoMovimiento: transferCode,
+
+            detalle: (
+              `TRANSFERENCIA SALIDA ${transferCode} ` +
+              `${fromName} → ${toName}`
+            ).toUpperCase(),
+
+            entrada: 0,
+            salida: mov.quantity,
+
+            costoUnitario: mov.unitCost || 0,
+          });
+
+          movimientosProducto.push({
+            fecha: mov.createdAt,
+
+            codigoMovimiento: transferCode,
+
+            detalle: (
+              `TRANSFERENCIA ENTRADA ${transferCode} ` +
+              `${fromName} → ${toName}`
+            ).toUpperCase(),
+
+            entrada: mov.quantity,
+            salida: 0,
+
+            costoUnitario: mov.unitCost || 0,
+          });
+
+          continue;
         }
       }
 
@@ -474,7 +516,9 @@ export const getKardexRepo = async ({
       movimientosProducto.push({
         fecha: mov.createdAt,
 
-        detalle,
+        codigoMovimiento,
+
+        detalle: detalle.toUpperCase(),
 
         entrada,
         salida,
@@ -488,8 +532,7 @@ export const getKardexRepo = async ({
     //////////////////////////////////////////////////////////
 
     movimientosProducto.sort(
-      (a, b) =>
-        new Date(a.fecha).getTime() - new Date(b.fecha).getTime(),
+      (a, b) => new Date(a.fecha).getTime() - new Date(b.fecha).getTime(),
     );
 
     //////////////////////////////////////////////////////////
@@ -509,6 +552,8 @@ export const getKardexRepo = async ({
         kardex: [
           {
             fecha: new Date(),
+
+            codigoMovimiento: "",
 
             detalle: "SIN MOVIMIENTOS",
 
@@ -545,10 +590,25 @@ export const getKardexRepo = async ({
 
     for (const mov of movimientosProducto) {
       ////////////////////////////////////////////////////////
+      // 🔥 COSTO REAL DEL MOVIMIENTO
+      ////////////////////////////////////////////////////////
+
+      let costoMovimiento = Number(mov.costoUnitario || 0);
+
+      ////////////////////////////////////////////////////////
+      // 🔥 SI ENTRA CON COSTO 0
+      // USAR COSTO PROMEDIO ACTUAL
+      ////////////////////////////////////////////////////////
+
+      if (mov.entrada > 0 && costoMovimiento <= 0) {
+        costoMovimiento = costoPromedio;
+      }
+
+      ////////////////////////////////////////////////////////
       // 🔥 TOTAL ENTRADA
       ////////////////////////////////////////////////////////
 
-      const entradaTotal = mov.entrada * mov.costoUnitario;
+      const entradaTotal = mov.entrada * costoMovimiento;
 
       ////////////////////////////////////////////////////////
       // 🔥 ENTRADAS
@@ -560,9 +620,7 @@ export const getKardexRepo = async ({
         saldoCantidad += mov.entrada;
 
         costoPromedio =
-          saldoCantidad > 0
-            ? saldoTotal / saldoCantidad
-            : mov.costoUnitario;
+          saldoCantidad > 0 ? saldoTotal / saldoCantidad : costoMovimiento;
       }
 
       ////////////////////////////////////////////////////////
@@ -586,6 +644,8 @@ export const getKardexRepo = async ({
       kardexProducto.push({
         fecha: mov.fecha,
 
+        codigoMovimiento: mov.codigoMovimiento || "",
+
         detalle: mov.detalle,
 
         entrada: mov.entrada,
@@ -594,10 +654,7 @@ export const getKardexRepo = async ({
 
         saldoCantidad,
 
-        costoUnitario:
-          mov.entrada > 0
-            ? mov.costoUnitario
-            : costoPromedio,
+        costoUnitario: mov.entrada > 0 ? costoMovimiento : costoPromedio,
 
         entradaTotal,
 
@@ -624,11 +681,7 @@ export const getKardexRepo = async ({
     });
   }
 
-  console.log(
-    "✅ Kardex generado:",
-    resultado.length,
-    "productos",
-  );
+  console.log("✅ Kardex generado:", resultado.length, "productos");
 
   return resultado;
 };
