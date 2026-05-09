@@ -205,7 +205,7 @@ export const updateProductRepo = async (id: number, data: any) => {
           // 🔥 MOVIMIENTO HISTÓRICO
           // =====================================================
 
-          await prisma.stockMovement.create({
+          await tx.stockMovement.create({
             data: {
               productId: id,
 
