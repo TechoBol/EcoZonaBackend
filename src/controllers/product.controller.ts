@@ -225,6 +225,7 @@ export const updateProduct = async (req: Request, res: Response) => {
       locationId,
       lineId,
       brandName,
+      inventoryEdited
     } = req.body;
 
     // ==========================================
@@ -274,6 +275,7 @@ export const updateProduct = async (req: Request, res: Response) => {
       brandName: brandName.trim(),
       stock: stock !== undefined && stock !== null ? Number(stock) : undefined,
       locationId: locationId ? Number(locationId) : undefined,
+      inventoryEdited
     });
 
     return res.json(updated);

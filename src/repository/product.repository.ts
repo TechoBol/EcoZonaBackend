@@ -80,7 +80,7 @@ export const getProductByIdRepo = async (id: number) => {
 
 // 🔥 UPDATE
 export const updateProductRepo = async (id: number, data: any) => {
-  const { stock, locationId, ...productData } = data;
+  const { stock, locationId, inventoryEdited, ...productData } = data;
 
   return prisma.$transaction(async (tx) => {
     // ==========================================
@@ -110,116 +110,117 @@ export const updateProductRepo = async (id: number, data: any) => {
         brandName: productData.brandName,
       },
     });
-
-    // ==========================================
-    // 🔥 CONTROL INVENTARIO
-    // ==========================================
-    if (stock !== undefined && locationId) {
-      // =====================================================
-      // 🔥 INVENTARIO ACTUAL
-      // =====================================================
-
-      const inventory = await tx.inventory.findUnique({
-        where: {
-          productId_locationId: {
-            productId: id,
-            locationId,
-          },
-        },
-      });
-
-      // =====================================================
-      // 🔥 SI NO EXISTE INVENTARIO
-      // =====================================================
-
-      if (!inventory) {
-        await tx.inventory.create({
-          data: {
-            productId: id,
-            locationId,
-
-            quantity: stock,
-
-            averageCost: productData.price,
-          },
-        });
-
-        // 🔥 MOVIMIENTO
-        await tx.stockMovement.create({
-          data: {
-            productId: id,
-
-            toLocationId: locationId,
-
-            quantity: stock,
-
-            type: "IN",
-
-            unitCost: productData.price,
-
-            reference: "NUEVO INGRESO",
-          },
-        });
-      } else {
+    if (inventoryEdited) {
+      // ==========================================
+      // 🔥 CONTROL INVENTARIO
+      // ==========================================
+      if (stock !== undefined && locationId) {
         // =====================================================
-        // 🔥 PONDERADO
+        // 🔥 INVENTARIO ACTUAL
         // =====================================================
 
-        const cantidadActual = inventory.quantity;
-
-        const costoActual = inventory.averageCost;
-
-        const totalActual = cantidadActual * costoActual;
-
-        const totalNuevo = stock * productData.price;
-
-        const nuevaCantidad = cantidadActual + stock;
-
-        const nuevoPromedio =
-          nuevaCantidad > 0
-            ? (totalActual + totalNuevo) / nuevaCantidad
-            : productData.price;
-
-        // =====================================================
-        // 🔥 ACTUALIZAR INVENTARIO
-        // =====================================================
-
-        await tx.inventory.update({
+        const inventory = await tx.inventory.findUnique({
           where: {
             productId_locationId: {
               productId: id,
               locationId,
             },
           },
+        });
 
-          data: {
-            quantity: {
-              increment: stock,
+        // =====================================================
+        // 🔥 SI NO EXISTE INVENTARIO
+        // =====================================================
+
+        if (!inventory) {
+          await tx.inventory.create({
+            data: {
+              productId: id,
+              locationId,
+
+              quantity: stock,
+
+              averageCost: productData.price,
+            },
+          });
+
+          // 🔥 MOVIMIENTO
+          await tx.stockMovement.create({
+            data: {
+              productId: id,
+
+              toLocationId: locationId,
+
+              quantity: stock,
+
+              type: "IN",
+
+              unitCost: productData.price,
+
+              reference: "NUEVO INGRESO",
+            },
+          });
+        } else {
+          // =====================================================
+          // 🔥 PONDERADO
+          // =====================================================
+
+          const cantidadActual = inventory.quantity;
+
+          const costoActual = inventory.averageCost;
+
+          const totalActual = cantidadActual * costoActual;
+
+          const totalNuevo = stock * productData.price;
+
+          const nuevaCantidad = cantidadActual + stock;
+
+          const nuevoPromedio =
+            nuevaCantidad > 0
+              ? (totalActual + totalNuevo) / nuevaCantidad
+              : productData.price;
+
+          // =====================================================
+          // 🔥 ACTUALIZAR INVENTARIO
+          // =====================================================
+
+          await tx.inventory.update({
+            where: {
+              productId_locationId: {
+                productId: id,
+                locationId,
+              },
             },
 
-            averageCost: nuevoPromedio,
-          },
-        });
+            data: {
+              quantity: {
+                increment: stock,
+              },
 
-        // =====================================================
-        // 🔥 MOVIMIENTO HISTÓRICO
-        // =====================================================
+              averageCost: nuevoPromedio,
+            },
+          });
 
-        await prisma.stockMovement.create({
-          data: {
-            productId: id,
+          // =====================================================
+          // 🔥 MOVIMIENTO HISTÓRICO
+          // =====================================================
 
-            toLocationId: locationId,
+          await prisma.stockMovement.create({
+            data: {
+              productId: id,
 
-            quantity: stock,
+              toLocationId: locationId,
 
-            type: "IN",
+              quantity: stock,
 
-            unitCost: productData.price,
+              type: "IN",
 
-            reference: "REPOSICION STOCK",
-          },
-        });
+              unitCost: productData.price,
+
+              reference: "REPOSICION STOCK",
+            },
+          });
+        }
       }
     }
 
