@@ -686,3 +686,117 @@ export const getKardexRepo = async ({
 
   return resultado;
 };
+
+export const getKardexRepository = async (
+  filters: any,
+) => {
+  const {
+    sucursal,
+    item,
+    marca,
+    linea,
+    vendedor,
+    fromDate,
+    toDate,
+  } = filters;
+
+  //////////////////////////////////////////
+  // QUERY
+  //////////////////////////////////////////
+
+  const sales = await prisma.saleDetail.findMany({
+    where: {
+      sale: {
+        date: {
+          gte: fromDate
+            ? new Date(fromDate)
+            : undefined,
+
+          lte: toDate
+            ? new Date(
+                `${toDate}T23:59:59.999Z`,
+              )
+            : undefined,
+        },
+
+        locationId: sucursal
+          ? Number(sucursal)
+          : undefined,
+
+        employeeId: vendedor
+          ? Number(vendedor)
+          : undefined,
+      },
+
+      product: {
+        name: item
+          ? {
+              contains: item,
+              mode: "insensitive",
+            }
+          : undefined,
+
+        brandName: marca
+          ? {
+              contains: marca,
+              mode: "insensitive",
+            }
+          : undefined,
+
+        lineId: linea
+          ? Number(linea)
+          : undefined,
+      },
+    },
+
+    include: {
+      product: {
+        include: {
+          line: true,
+        },
+      },
+    },
+  });
+
+  //////////////////////////////////////////
+  // AGRUPAR PRODUCTOS
+  //////////////////////////////////////////
+
+  const grouped: any = {};
+
+  sales.forEach((item) => {
+    const key = item.product.id;
+
+    if (!grouped[key]) {
+      grouped[key] = {
+        id: item.product.id,
+
+        product: item.product.name,
+
+        line:
+          item.product.line?.name || "",
+
+        brand:
+          item.product.brandName || "",
+
+        quantity: 0,
+
+        total: 0,
+      };
+    }
+
+    grouped[key].quantity += item.quantity;
+
+    grouped[key].total +=
+      item.quantity * item.price;
+  });
+
+  //////////////////////////////////////////
+  // RETORNAR
+  //////////////////////////////////////////
+
+  return Object.values(grouped).sort(
+    (a: any, b: any) =>
+      b.total - a.total,
+  );
+};

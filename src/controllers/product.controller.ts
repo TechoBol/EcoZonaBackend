@@ -7,6 +7,7 @@ import {
   updateProductRepo,
   deleteProductRepo,
   getKardexRepo,
+  getKardexRepository,
 } from "../repository/product.repository";
 import jwt from "jsonwebtoken";
 
@@ -315,6 +316,31 @@ export const getKardex = async (req: Request, res: Response) => {
 
     return res.status(500).json({
       message: "Error al generar kardex",
+    });
+  }
+};
+
+export const getKardexPro = async (
+  req: Request,
+  res: Response,
+) => {
+  try {
+    const data = await getKardexRepository(
+      req.body,
+    );
+
+    return res.status(200).json({
+      ok: true,
+      data,
+    });
+  } catch (error: any) {
+    console.error(error);
+
+    return res.status(500).json({
+      ok: false,
+      message:
+        error.message ||
+        "Error obteniendo kardex",
     });
   }
 };
