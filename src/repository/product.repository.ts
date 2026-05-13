@@ -687,116 +687,187 @@ export const getKardexRepo = async ({
   return resultado;
 };
 
-export const getKardexRepository = async (
-  filters: any,
-) => {
-  const {
-    sucursal,
-    item,
-    marca,
-    linea,
-    vendedor,
-    fromDate,
-    toDate,
-  } = filters;
+export const getKardexRepository =
+  async (body: any) => {
+    const {
+      fromDate,
+      toDate,
+      sucursal,
+      linea,
+      marca,
+      groupBy,
+    } = body;
 
-  //////////////////////////////////////////
-  // QUERY
-  //////////////////////////////////////////
+    //////////////////////////////////////////
+    // QUERY
+    //////////////////////////////////////////
 
-  const sales = await prisma.saleDetail.findMany({
-    where: {
-      sale: {
-        date: {
-          gte: fromDate
-            ? new Date(fromDate)
-            : undefined,
+    const sales =
+      await prisma.saleDetail.findMany({
+        where: {
+          sale: {
+            date: {
+              gte: new Date(fromDate),
 
-          lte: toDate
-            ? new Date(
-                `${toDate}T23:59:59.999Z`,
-              )
-            : undefined,
+              lte: new Date(toDate),
+            },
+
+            ...(sucursal && {
+              locationId:
+                Number(sucursal),
+            }),
+          },
+
+          product: {
+            ...(linea && {
+              lineId:
+                Number(linea),
+            }),
+
+            ...(marca && {
+              brandName:
+                marca,
+            }),
+          },
         },
 
-        locationId: sucursal
-          ? Number(sucursal)
-          : undefined,
-
-        employeeId: vendedor
-          ? Number(vendedor)
-          : undefined,
-      },
-
-      product: {
-        name: item
-          ? {
-              contains: item,
-              mode: "insensitive",
-            }
-          : undefined,
-
-        brandName: marca
-          ? {
-              contains: marca,
-              mode: "insensitive",
-            }
-          : undefined,
-
-        lineId: linea
-          ? Number(linea)
-          : undefined,
-      },
-    },
-
-    include: {
-      product: {
         include: {
-          line: true,
+          sale: {
+            include: {
+              employee: true,
+
+              location: true,
+            },
+          },
+
+          product: {
+            include: {
+              line: true,
+            },
+          },
         },
-      },
-    },
-  });
+      });
 
-  //////////////////////////////////////////
-  // AGRUPAR PRODUCTOS
-  //////////////////////////////////////////
+    //////////////////////////////////////////
+    // GROUP
+    //////////////////////////////////////////
 
-  const grouped: any = {};
+    const grouped: any = {};
 
-  sales.forEach((item) => {
-    const key = item.product.id;
+    for (const item of sales) {
+      //////////////////////////////////////
+      // EXTRA DATA
+      //////////////////////////////////////
 
-    if (!grouped[key]) {
-      grouped[key] = {
-        id: item.product.id,
+      const seller =
+        `${item.sale.employee.name} ${item.sale.employee.lastName}`;
 
-        product: item.product.name,
+      const branch =
+        item.sale.location.name;
 
-        line:
-          item.product.line?.name || "",
+      const line =
+        item.product.line?.name ||
+        "Sin línea";
 
-        brand:
-          item.product.brandName || "",
+      const brand =
+        item.product.brandName ||
+        "Sin marca";
 
-        quantity: 0,
+      //////////////////////////////////////
+      // GROUP VALUE
+      //////////////////////////////////////
 
-        total: 0,
-      };
+      let group = "GENERAL";
+
+      if (groupBy === "seller") {
+        group = seller;
+      }
+
+      if (groupBy === "line") {
+        group = line;
+      }
+
+      if (groupBy === "brand") {
+        group = brand;
+      }
+
+      if (groupBy === "branch") {
+        group = branch;
+      }
+
+      //////////////////////////////////////
+      // UNIQUE KEY
+      //////////////////////////////////////
+
+      const key =
+        `${group}-${item.product.id}`;
+
+      //////////////////////////////////////
+      // CREATE ROW
+      //////////////////////////////////////
+
+      if (!grouped[key]) {
+        grouped[key] = {
+          id: key,
+
+          //////////////////////////////////
+          // GROUP
+          //////////////////////////////////
+
+          group:
+            groupBy
+              ? group
+              : null,
+
+          //////////////////////////////////
+          // PRODUCT
+          //////////////////////////////////
+
+          product:
+            item.product.name,
+
+          //////////////////////////////////
+          // EXTRA INFO
+          //////////////////////////////////
+
+          line,
+
+          brand,
+
+          seller,
+
+          branch,
+
+          barcode:
+            item.product.barcode,
+
+          //////////////////////////////////
+          // TOTALS
+          //////////////////////////////////
+
+          quantity: 0,
+
+          total: 0,
+        };
+      }
+
+      //////////////////////////////////////
+      // SUMS
+      //////////////////////////////////////
+
+      grouped[key]
+        .quantity +=
+        item.quantity;
+
+      grouped[key]
+        .total +=
+        item.quantity *
+        item.price;
     }
 
-    grouped[key].quantity += item.quantity;
+    //////////////////////////////////////////
+    // RETURN
+    //////////////////////////////////////////
 
-    grouped[key].total +=
-      item.quantity * item.price;
-  });
-
-  //////////////////////////////////////////
-  // RETORNAR
-  //////////////////////////////////////////
-
-  return Object.values(grouped).sort(
-    (a: any, b: any) =>
-      b.total - a.total,
-  );
-};
+    return Object.values(grouped);
+  };
