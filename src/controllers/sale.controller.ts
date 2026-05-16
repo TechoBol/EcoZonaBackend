@@ -9,29 +9,22 @@ import {
   getProductRepo,
   updateSaleTotalRepo,
   getSalesRepo,
+  cancelSaleRepo,
 } from "../repository/sale.repository";
 import jwt from "jsonwebtoken";
 
 export const createSale = async (req: Request, res: Response) => {
   try {
-    const {
-      locationId,
-      products,
-      codigoTransaccion,
-      metodoPago,
-      discount,
-    } = req.body;
+    const { locationId, products, codigoTransaccion, metodoPago, discount } =
+      req.body;
 
     const token = req.headers["x-access-token"] as string;
 
-    const user = jwt.verify(
-      token,
-      process.env.JWTSECRET!,
-    ) as any;
+    const user = jwt.verify(token, process.env.JWTSECRET!) as any;
 
     const sale = await prisma.$transaction(
       async (tx) => {
-        let total = 0;
+        let subtotal = 0;
 
         // =====================================================
         // 🔥 VALIDAR STOCK
@@ -43,10 +36,7 @@ export const createSale = async (req: Request, res: Response) => {
             locationId,
           );
 
-          if (
-            !inventory ||
-            inventory.quantity < item.quantity
-          ) {
+          if (!inventory || inventory.quantity < item.quantity) {
             throw new Error("insufficient stock");
           }
         }
@@ -54,11 +44,7 @@ export const createSale = async (req: Request, res: Response) => {
         // =====================================================
         // 🔥 INCREMENTAR CONTADOR
         // =====================================================
-        const location =
-          await incrementLocationCounterRepo(
-            tx,
-            locationId,
-          );
+        const location = await incrementLocationCounterRepo(tx, locationId);
 
         const saleNumber = location.saleCounter;
 
@@ -71,6 +57,10 @@ export const createSale = async (req: Request, res: Response) => {
           employeeId: user.id,
 
           locationId,
+
+          subtotal: 0,
+
+          discount: 0,
 
           total: 0,
 
@@ -87,10 +77,7 @@ export const createSale = async (req: Request, res: Response) => {
         // 🔥 DETALLES + INVENTARIO + KARDEX
         // =====================================================
         for (const item of products) {
-          const product = await getProductRepo(
-            tx,
-            item.productId,
-          );
+          const product = await getProductRepo(tx, item.productId);
 
           if (!product) {
             throw new Error("product not found");
@@ -99,20 +86,17 @@ export const createSale = async (req: Request, res: Response) => {
           // ==========================================
           // 🔥 INVENTARIO ACTUAL
           // ==========================================
-          const inventory =
-            await tx.inventory.findUnique({
-              where: {
-                productId_locationId: {
-                  productId: item.productId,
-                  locationId,
-                },
+          const inventory = await tx.inventory.findUnique({
+            where: {
+              productId_locationId: {
+                productId: item.productId,
+                locationId,
               },
-            });
+            },
+          });
 
           if (!inventory) {
-            throw new Error(
-              "inventory not found",
-            );
+            throw new Error("inventory not found");
           }
 
           // ==========================================
@@ -120,7 +104,7 @@ export const createSale = async (req: Request, res: Response) => {
           // ==========================================
           const price = product.finalPrice;
 
-          total += price * item.quantity;
+          subtotal += price * item.quantity;
 
           // ==========================================
           // 🔥 DETALLE VENTA
@@ -159,9 +143,7 @@ export const createSale = async (req: Request, res: Response) => {
               type: "OUT",
 
               // 🔥 COSTO PROMEDIO REAL
-              unitCost:
-                inventory.averageCost ||
-                product.price,
+              unitCost: inventory.averageCost || product.price,
 
               reference: `VENTA ${code}`,
             },
@@ -171,11 +153,13 @@ export const createSale = async (req: Request, res: Response) => {
         // =====================================================
         // 🔥 ACTUALIZAR TOTAL
         // =====================================================
-        await updateSaleTotalRepo(
-          tx,
-          newSale.id,
-          total - (discount || 0),
-        );
+        await updateSaleTotalRepo(tx, newSale.id, {
+          subtotal,
+
+          discount: discount || 0,
+
+          total: subtotal - (discount || 0),
+        });
 
         // =====================================================
         // 🔥 OBTENER VENTA COMPLETA
@@ -213,42 +197,27 @@ export const createSale = async (req: Request, res: Response) => {
     console.error("❌ ERROR CREATE SALE:", err);
 
     return res.status(500).json({
-      message:
-        err.message ||
-        "No se pudo crear la venta",
+      message: err.message || "No se pudo crear la venta",
     });
   }
 };
 
-export const getSales = async (
-  req: Request,
-  res: Response,
-) => {
+export const getSales = async (req: Request, res: Response) => {
   try {
-    const token = req.headers[
-      "x-access-token"
-    ] as string;
+    const token = req.headers["x-access-token"] as string;
 
-    const user = jwt.verify(
-      token,
-      process.env.JWTSECRET!,
-    ) as any;
+    const user = jwt.verify(token, process.env.JWTSECRET!) as any;
 
-    const isManagement =
-      user.level === 1 || user.level === 4;
+    const isManagement = user.level === 1 || user.level === 4;
 
-    const data = await getSalesRepo(
-      Number(user.locationId),
-      isManagement,
-    );
+    const data = await getSalesRepo(Number(user.locationId), isManagement);
 
     return res.json(data);
   } catch (error) {
     console.error("❌ ERROR GET SALES:", error);
 
     return res.status(500).json({
-      message:
-        "No se pudieron obtener las ventas",
+      message: "No se pudieron obtener las ventas",
     });
   }
 };
@@ -265,7 +234,9 @@ export const updateSalePaymentMethod = async (req: Request, res: Response) => {
     if (!sale) return res.status(404).json({ error: "Venta no encontrada" });
 
     if (sale.paymentMethodChanged) {
-      return res.status(400).json({ error: "El método de pago ya fue cambiado anteriormente" });
+      return res
+        .status(400)
+        .json({ error: "El método de pago ya fue cambiado anteriormente" });
     }
 
     const updated = await prisma.sale.update({
@@ -286,7 +257,9 @@ export const updateSalePaymentMethod = async (req: Request, res: Response) => {
 
     return res.json(updated);
   } catch (error) {
-    return res.status(500).json({ error: "Error al actualizar el método de pago" });
+    return res
+      .status(500)
+      .json({ error: "Error al actualizar el método de pago" });
   }
 };
 
@@ -338,6 +311,38 @@ export const updateSaleDate = async (req: Request, res: Response) => {
   } catch (error) {
     return res.status(500).json({
       error: "Error al actualizar la fecha",
+    });
+  }
+};
+
+export const cancelSale = async (
+  req: Request,
+  res: Response,
+) => {
+  try {
+    const saleId = Number(req.params.id);
+
+    const { reason } = req.body;
+    const token = req.headers["x-access-token"] as string;
+
+    const user = jwt.verify(token, process.env.JWTSECRET!) as any;
+
+    if (!reason || !reason.trim()) {
+      return res.status(400).json({
+        error: "El motivo es obligatorio",
+      });
+    }
+
+    const sale = await cancelSaleRepo(
+      saleId,
+      reason,
+      user.id,
+    );
+
+    return res.json(sale);
+  } catch (error: any) {
+    return res.status(500).json({
+      error: error.message,
     });
   }
 };

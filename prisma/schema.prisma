@@ -203,6 +203,7 @@ model Transfer {
 
   items     TransferItem[]
   movements StockMovement[]
+  glosa     String?
 
   @@index([fromLocationId])
   @@index([status])
@@ -230,13 +231,24 @@ enum TransferStatus {
 // 💰 VENTAS
 //////////////////////
 
+enum SaleStatus {
+  ACTIVE
+  CANCELLED
+}
+
 model Sale {
-  id         Int      @id @default(autoincrement())
-  date       DateTime @default(now())
+  id   Int      @id @default(autoincrement())
+  date DateTime @default(now())
+
   location   Location @relation(fields: [locationId], references: [id])
   locationId Int
+
   employee   Employee @relation(fields: [employeeId], references: [id])
   employeeId Int
+
+  subtotal Float @default(0)
+
+  discount Float @default(0)
 
   total Float
 
@@ -249,6 +261,12 @@ model Sale {
   transactionNumber    String?
   paymentMethodChanged Boolean? @default(false)
   dateChanged          Boolean? @default(false)
+
+  // NUEVOS CAMPOS
+  status        SaleStatus @default(ACTIVE)
+  cancelReason  String?
+  cancelledAt   DateTime?
+  cancelledById Int?
 }
 
 model SaleDetail {

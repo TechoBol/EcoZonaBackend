@@ -5,6 +5,7 @@ export const createTransferRepo = async (data: {
   toLocationId: number;
   fromLocationID?: number;
   items: { productId: number; quantity: number }[];
+  glosa : string;
 }) => {
   return await prisma.$transaction(async (tx) => {
     ////////////////////////////////////////
@@ -59,6 +60,7 @@ export const createTransferRepo = async (data: {
         items: {
           create: data.items,
         },
+        glosa: data.glosa
       },
 
       include: {
