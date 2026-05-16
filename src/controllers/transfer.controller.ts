@@ -12,7 +12,7 @@ export const createTransfer = async (req: Request, res: Response) => {
     const token = req.headers["x-access-token"] as string;
     const user = jwt.verify(token, process.env.JWTSECRET!) as any;
 
-    const { destinationId, items } = req.body;
+    const { destinationId, items ,glosa } = req.body;
 
     if (!items?.length) {
       return res.status(400).json({ message: "Items requeridos" });
@@ -23,6 +23,7 @@ export const createTransfer = async (req: Request, res: Response) => {
       toLocationId: destinationId ? destinationId : user.locationId,
       fromLocationID: destinationId ? 1 : undefined,
       items,
+      glosa,
     });
     let dataAprobado
     if (destinationId) {

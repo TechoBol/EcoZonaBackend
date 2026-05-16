@@ -9,11 +9,18 @@ export const createSaleRepo = async (tx: any, data: any) => {
 export const updateSaleTotalRepo = async (
   tx: any,
   saleId: number,
-  total: number,
+  data: any,
 ) => {
   return await tx.sale.update({
     where: { id: saleId },
-    data: { total },
+
+    data: {
+      subtotal: data.subtotal,
+
+      discount: data.discount,
+
+      total: data.total,
+    },
   });
 };
 
@@ -90,45 +97,86 @@ export const getSalesRepo = async (
           locationId: locationId,
         },
 
-    select: {
-      id: true,
-      code: true,
-      total: true,
-      date: true,
-      pdfUrl: true,
-      typeSale: true,
-      location: {
-        select: {
-          name: true,
-        },
-      },
-
-      employee: {
-        select: {
-          name: true,
-          lastName: true,
-        },
-      },
-
-      details: {
         select: {
           id: true,
-          quantity: true,
-          price: true,
-
-          product: {
+          code: true,
+          total: true,
+          date: true,
+          pdfUrl: true,
+          typeSale: true,
+        
+          status: true,
+          cancelReason: true,
+          cancelledAt: true,
+        
+          location: {
+            select: {
+              name: true,
+            },
+          },
+        
+          employee: {
+            select: {
+              name: true,
+              lastName: true,
+            },
+          },
+        
+          details: {
             select: {
               id: true,
-              name: true,
-              barcode: true,
+              quantity: true,
+              price: true,
+        
+              product: {
+                select: {
+                  id: true,
+                  name: true,
+                  barcode: true,
+                },
+              },
             },
           },
         },
-      },
-    },
 
     orderBy: {
       date: "desc",
     },
   });
+};
+
+export const cancelSaleRepo = async (
+  saleId: number,
+  reason: string,
+  userId: number,
+) => {
+  const sale = await prisma.sale.findUnique({
+    where: {
+      id: saleId,
+    },
+  });
+
+  if (!sale) {
+    throw new Error("Venta no encontrada");
+  }
+
+  if (sale.status === "CANCELLED") {
+    throw new Error(
+      "La venta ya fue cancelada",
+    );
+  }
+
+  const updatedSale = await prisma.sale.update({
+    where: {
+      id: saleId,
+    },
+    data: {
+      status: "CANCELLED",
+      cancelReason: reason,
+      cancelledAt: new Date(),
+      cancelledById: userId,
+    },
+  });
+
+  return updatedSale;
 };
