@@ -688,86 +688,247 @@ export const getKardexRepo = async ({
 };
 
 export const getKardexRepository = async (body: any) => {
-  const { fromDate, toDate, sucursal, linea, marca, groupBy } = body;
+  const {
+    fromDate,
+    toDate,
+    sucursal,
+    linea,
+    marca,
+    groupBy,
+  } = body;
+
+  ////////////////////////////////////////////////////////////
+  // 🔥 FECHAS
+  ////////////////////////////////////////////////////////////
+
+  const from = new Date(`${fromDate}T00:00:00`);
+
+  const to = new Date(`${toDate}T23:59:59`);
+
+  ////////////////////////////////////////////////////////////
+  // 🔥 VENTAS
+  ////////////////////////////////////////////////////////////
 
   const sales = await prisma.saleDetail.findMany({
     where: {
       sale: {
-        date: { gte: new Date(fromDate), lte: new Date(toDate) },
-        ...(sucursal && { locationId: Number(sucursal) }),
+        status: "ACTIVE",
+
+        date: {
+          gte: from,
+          lte: to,
+        },
+
+        ...(sucursal &&
+          sucursal !== "" && {
+            locationId: Number(sucursal),
+          }),
       },
+
       product: {
-        ...(linea && { lineId: Number(linea) }),
-        ...(marca && { brandName: marca }),
+        ...(linea &&
+          linea !== "" && {
+            lineId: Number(linea),
+          }),
+
+        ...(marca &&
+          marca.trim() !== "" && {
+            brandName: {
+              contains: marca,
+              mode: "insensitive",
+            },
+          }),
       },
     },
+
     include: {
       sale: {
         include: {
           employee: true,
           location: true,
-          details: true, // 🔥 necesitamos todos los detalles para prorratear
+          details: true,
         },
       },
-      product: { include: { line: true } },
+
+      product: {
+        include: {
+          line: true,
+        },
+      },
     },
   });
+
+  ////////////////////////////////////////////////////////////
+  // 🔥 GROUPED
+  ////////////////////////////////////////////////////////////
 
   const grouped: any = {};
 
   for (const item of sales) {
-    const seller = `${item.sale.employee.name} ${item.sale.employee.lastName}`;
+    const seller =
+      `${item.sale.employee.name} ${item.sale.employee.lastName}`;
+
     const branch = item.sale.location.name;
+
     const line = item.product.line?.name || "Sin línea";
+
     const brand = item.product.brandName || "Sin marca";
 
+    //////////////////////////////////////////////////////////
+    // 🔥 GROUP
+    //////////////////////////////////////////////////////////
+
     let group = "GENERAL";
-    if (groupBy === "seller") group = seller;
-    if (groupBy === "line") group = line;
-    if (groupBy === "brand") group = brand;
-    if (groupBy === "branch") group = branch;
+
+    if (groupBy === "seller") {
+      group = seller;
+    }
+
+    if (groupBy === "line") {
+      group = line;
+    }
+
+    if (groupBy === "brand") {
+      group = brand;
+    }
+
+    if (groupBy === "branch") {
+      group = branch;
+    }
+
+    //////////////////////////////////////////////////////////
+    // 🔥 KEY
+    //////////////////////////////////////////////////////////
 
     const key = `${group}-${item.product.id}`;
+
+    //////////////////////////////////////////////////////////
+    // 🔥 INIT
+    //////////////////////////////////////////////////////////
 
     if (!grouped[key]) {
       grouped[key] = {
         id: key,
+
         group: groupBy ? group : null,
+
         product: item.product.name,
+
         line,
+
         brand,
+
         seller,
+
         branch,
+
         barcode: item.product.barcode,
+
         quantity: 0,
+
         subtotal: 0,
+
         discount: 0,
+
         total: 0,
       };
     }
 
-    // Subtotal de este item
-    const itemSubtotal = item.quantity * item.price;
+    //////////////////////////////////////////////////////////
+    // 🔥 SUBTOTAL ITEM
+    //////////////////////////////////////////////////////////
 
-    // 🔥 Prorrateo del descuento
-    // Cuánto representa este item del total de la venta
+    const itemSubtotal =
+      Number(item.quantity) * Number(item.price);
+
+    //////////////////////////////////////////////////////////
+    // 🔥 SUBTOTAL DE LA VENTA
+    //////////////////////////////////////////////////////////
+
     const saleSubtotal = item.sale.details.reduce(
-      (acc, d) => acc + d.quantity * d.price,
-      0
+      (acc, detail) =>
+        acc +
+        Number(detail.quantity) *
+          Number(detail.price),
+
+      0,
     );
 
-    const saleDiscount = item.sale.discount || 0;
+    //////////////////////////////////////////////////////////
+    // 🔥 DESCUENTO TOTAL VENTA
+    //////////////////////////////////////////////////////////
 
-    const itemDiscountShare =
-      saleSubtotal > 0
-        ? (itemSubtotal / saleSubtotal) * saleDiscount
-        : 0;
+    const saleDiscount =
+      Number(item.sale.discount || 0);
 
-    grouped[key].quantity += item.quantity;
+    //////////////////////////////////////////////////////////
+    // 🔥 PRORRATEO
+    //////////////////////////////////////////////////////////
+
+    let itemDiscount = 0;
+
+    if (saleSubtotal > 0 && saleDiscount > 0) {
+      itemDiscount =
+        (itemSubtotal / saleSubtotal) *
+        saleDiscount;
+    }
+
+    //////////////////////////////////////////////////////////
+    // 🔥 TOTAL NETO ITEM
+    //////////////////////////////////////////////////////////
+
+    const itemTotal =
+      itemSubtotal - itemDiscount;
+
+    //////////////////////////////////////////////////////////
+    // 🔥 ACUMULAR
+    //////////////////////////////////////////////////////////
+
+    grouped[key].quantity += Number(item.quantity);
+
     grouped[key].subtotal += itemSubtotal;
-    grouped[key].discount += itemDiscountShare;
-    grouped[key].total += itemSubtotal - itemDiscountShare;
+
+    grouped[key].discount += itemDiscount;
+
+    grouped[key].total += itemTotal;
   }
 
-  return Object.values(grouped);
+  ////////////////////////////////////////////////////////////
+  // 🔥 RESULTADO
+  ////////////////////////////////////////////////////////////
+
+  const result = Object.values(grouped);
+
+  ////////////////////////////////////////////////////////////
+  // 🔥 LOGS
+  ////////////////////////////////////////////////////////////
+
+  const subtotal = result.reduce(
+    (acc: number, item: any) =>
+      acc + Number(item.subtotal || 0),
+
+    0,
+  );
+
+  const discount = result.reduce(
+    (acc: number, item: any) =>
+      acc + Number(item.discount || 0),
+
+    0,
+  );
+
+  const total = result.reduce(
+    (acc: number, item: any) =>
+      acc + Number(item.total || 0),
+
+    0,
+  );
+
+  console.log("💰 SUBTOTAL:", subtotal);
+
+  console.log("🏷️ DISCOUNT:", discount);
+
+  console.log("✅ TOTAL:", total);
+
+  return result;
 };
