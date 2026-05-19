@@ -3,7 +3,7 @@ import prisma from "../config/db";
 export const createTransferRepo = async (data: {
   requestedById: number;
   toLocationId: number;
-  fromLocationID?: number;
+  fromLocationId?: number;
   items: { productId: number; quantity: number }[];
   glosa : string;
 }) => {
@@ -53,7 +53,7 @@ export const createTransferRepo = async (data: {
 
         toLocationId: data.toLocationId,
 
-        fromLocationId: data.fromLocationID,
+        fromLocationId: data.fromLocationId,
 
         status: "PENDING",
 
