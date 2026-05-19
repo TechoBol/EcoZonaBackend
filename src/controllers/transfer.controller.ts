@@ -21,7 +21,7 @@ export const createTransfer = async (req: Request, res: Response) => {
     const data = await createTransferRepo({
       requestedById: user.id,
       toLocationId: destinationId ? destinationId : user.locationId,
-      fromLocationID: destinationId ? 1 : undefined,
+      fromLocationId: destinationId ? 1 : undefined,
       items,
       glosa,
     });
@@ -31,6 +31,7 @@ export const createTransfer = async (req: Request, res: Response) => {
     }
     return res.json(dataAprobado ? dataAprobado : data);
   } catch (error) {
+    console.log(error);
     return res.status(500).json({ message: "error creating request" });
   }
 };
