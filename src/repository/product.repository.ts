@@ -688,13 +688,23 @@ export const getKardexRepo = async ({
 };
 
 export const getKardexRepository = async (body: any) => {
+  ////////////////////////////////////////////////////////////
+  // 🔥 ROUND
+  ////////////////////////////////////////////////////////////
+
+  const round = (value: number) =>
+    Number(value.toFixed(2));
+
+  ////////////////////////////////////////////////////////////
+  // 🔥 BODY
+  ////////////////////////////////////////////////////////////
+
   const {
     fromDate,
     toDate,
     sucursal,
     linea,
     marca,
-    groupBy,
   } = body;
 
   ////////////////////////////////////////////////////////////
@@ -746,7 +756,6 @@ export const getKardexRepository = async (body: any) => {
         include: {
           employee: true,
           location: true,
-          details: true,
         },
       },
 
@@ -756,172 +765,228 @@ export const getKardexRepository = async (body: any) => {
         },
       },
     },
+
+    orderBy: {
+      saleId: "asc",
+    },
   });
 
   ////////////////////////////////////////////////////////////
-  // 🔥 GROUPED
+  // 🔥 AGRUPAR POR VENTA
   ////////////////////////////////////////////////////////////
 
-  const grouped: any = {};
+  const groupedSales = sales.reduce(
+    (acc: any, item) => {
+      const saleId = item.sale.id;
 
-  for (const item of sales) {
-    const seller =
-      `${item.sale.employee.name} ${item.sale.employee.lastName}`;
+      if (!acc[saleId]) {
+        acc[saleId] = [];
+      }
 
-    const branch = item.sale.location.name;
+      acc[saleId].push(item);
 
-    const line = item.product.line?.name || "Sin línea";
-
-    const brand = item.product.brandName || "Sin marca";
-
-    //////////////////////////////////////////////////////////
-    // 🔥 GROUP
-    //////////////////////////////////////////////////////////
-
-    let group = "GENERAL";
-
-    if (groupBy === "seller") {
-      group = seller;
-    }
-
-    if (groupBy === "line") {
-      group = line;
-    }
-
-    if (groupBy === "brand") {
-      group = brand;
-    }
-
-    if (groupBy === "branch") {
-      group = branch;
-    }
-
-    //////////////////////////////////////////////////////////
-    // 🔥 KEY
-    //////////////////////////////////////////////////////////
-
-    const key = `${group}-${item.product.id}`;
-
-    //////////////////////////////////////////////////////////
-    // 🔥 INIT
-    //////////////////////////////////////////////////////////
-
-    if (!grouped[key]) {
-      grouped[key] = {
-        id: key,
-
-        group: groupBy ? group : null,
-
-        product: item.product.name,
-
-        line,
-
-        brand,
-
-        seller,
-
-        branch,
-
-        barcode: item.product.barcode,
-
-        quantity: 0,
-
-        subtotal: 0,
-
-        discount: 0,
-
-        total: 0,
-      };
-    }
-
-    //////////////////////////////////////////////////////////
-    // 🔥 SUBTOTAL ITEM
-    //////////////////////////////////////////////////////////
-
-    const itemSubtotal =
-      Number(item.quantity) * Number(item.price);
-
-    //////////////////////////////////////////////////////////
-    // 🔥 SUBTOTAL DE LA VENTA
-    //////////////////////////////////////////////////////////
-
-    const saleSubtotal = item.sale.details.reduce(
-      (acc, detail) =>
-        acc +
-        Number(detail.quantity) *
-          Number(detail.price),
-
-      0,
-    );
-
-    //////////////////////////////////////////////////////////
-    // 🔥 DESCUENTO TOTAL VENTA
-    //////////////////////////////////////////////////////////
-
-    const saleDiscount =
-      Number(item.sale.discount || 0);
-
-    //////////////////////////////////////////////////////////
-    // 🔥 PRORRATEO
-    //////////////////////////////////////////////////////////
-
-    let itemDiscount = 0;
-
-    if (saleSubtotal > 0 && saleDiscount > 0) {
-      itemDiscount =
-        (itemSubtotal / saleSubtotal) *
-        saleDiscount;
-    }
-
-    //////////////////////////////////////////////////////////
-    // 🔥 TOTAL NETO ITEM
-    //////////////////////////////////////////////////////////
-
-    const itemTotal =
-      itemSubtotal - itemDiscount;
-
-    //////////////////////////////////////////////////////////
-    // 🔥 ACUMULAR
-    //////////////////////////////////////////////////////////
-
-    grouped[key].quantity += Number(item.quantity);
-
-    grouped[key].subtotal += itemSubtotal;
-
-    grouped[key].discount += itemDiscount;
-
-    grouped[key].total += itemTotal;
-  }
+      return acc;
+    },
+    {}
+  );
 
   ////////////////////////////////////////////////////////////
-  // 🔥 RESULTADO
+  // 🔥 RESULT
   ////////////////////////////////////////////////////////////
 
-  const result = Object.values(grouped);
+  const result: any[] = [];
+
+  ////////////////////////////////////////////////////////////
+  // 🔥 RECORRER VENTAS
+  ////////////////////////////////////////////////////////////
+
+  Object.values(groupedSales).forEach(
+    (saleItems: any) => {
+      ////////////////////////////////////////////////////////
+      // 🔥 SALE
+      ////////////////////////////////////////////////////////
+
+      const sale = saleItems[0].sale;
+
+      ////////////////////////////////////////////////////////
+      // 🔥 SUBTOTAL VENTA
+      ////////////////////////////////////////////////////////
+
+      const saleSubtotal = round(
+        saleItems.reduce(
+          (acc: number, item: any) =>
+            acc +
+            Number(item.quantity) *
+              Number(item.price),
+          0
+        )
+      );
+
+      ////////////////////////////////////////////////////////
+      // 🔥 DESCUENTO TOTAL VENTA
+      ////////////////////////////////////////////////////////
+
+      const saleDiscount = round(
+        Number(sale.discount || 0)
+      );
+
+      ////////////////////////////////////////////////////////
+      // 🔥 ACUMULADOR DESCUENTO
+      ////////////////////////////////////////////////////////
+
+      let accumulatedDiscount = 0;
+
+      ////////////////////////////////////////////////////////
+      // 🔥 RECORRER ITEMS
+      ////////////////////////////////////////////////////////
+
+      saleItems.forEach(
+        (item: any, index: number) => {
+          ////////////////////////////////////////////////////
+          // 🔥 INFO
+          ////////////////////////////////////////////////////
+
+          const seller =
+            `${item.sale.employee.name} ${item.sale.employee.lastName}`;
+
+          const branch =
+            item.sale.location.name;
+
+          const line =
+            item.product.line?.name ||
+            "Sin línea";
+
+          const brand =
+            item.product.brandName ||
+            "Sin marca";
+
+          ////////////////////////////////////////////////////
+          // 🔥 SUBTOTAL ITEM
+          ////////////////////////////////////////////////////
+
+          const subtotal = round(
+            Number(item.quantity) *
+              Number(item.price)
+          );
+
+          ////////////////////////////////////////////////////
+          // 🔥 DESCUENTO
+          ////////////////////////////////////////////////////
+
+          let discount = 0;
+
+          const isLast =
+            index === saleItems.length - 1;
+
+          if (
+            saleSubtotal > 0 &&
+            saleDiscount > 0
+          ) {
+            //////////////////////////////////////////////////
+            // 🔥 ITEMS NORMALES
+            //////////////////////////////////////////////////
+
+            if (!isLast) {
+              discount = round(
+                (subtotal / saleSubtotal) *
+                  saleDiscount
+              );
+
+              accumulatedDiscount +=
+                discount;
+            }
+
+            //////////////////////////////////////////////////
+            // 🔥 ÚLTIMO ITEM AJUSTA DIFERENCIA
+            //////////////////////////////////////////////////
+
+            else {
+              discount = round(
+                saleDiscount -
+                  accumulatedDiscount
+              );
+            }
+          }
+
+          ////////////////////////////////////////////////////
+          // 🔥 TOTAL
+          ////////////////////////////////////////////////////
+
+          const total = round(
+            subtotal - discount
+          );
+
+          ////////////////////////////////////////////////////
+          // 🔥 PUSH
+          ////////////////////////////////////////////////////
+
+          result.push({
+            id: item.id,
+
+            //////////////////////////////////////////////////
+            // 🔥 INFO
+            //////////////////////////////////////////////////
+
+            name: item.product.name,
+
+            product: item.product.name,
+
+            seller,
+
+            branch,
+
+            line,
+
+            brand,
+
+            barcode:
+              item.product.barcode,
+
+            //////////////////////////////////////////////////
+            // 🔥 TOTALES
+            //////////////////////////////////////////////////
+
+            quantity: Number(
+              item.quantity
+            ),
+
+            subtotal,
+
+            discount,
+
+            total,
+          });
+        }
+      );
+    }
+  );
 
   ////////////////////////////////////////////////////////////
   // 🔥 LOGS
   ////////////////////////////////////////////////////////////
 
-  const subtotal = result.reduce(
-    (acc: number, item: any) =>
-      acc + Number(item.subtotal || 0),
-
-    0,
+  const subtotal = round(
+    result.reduce(
+      (acc, item) =>
+        acc + Number(item.subtotal || 0),
+      0
+    )
   );
 
-  const discount = result.reduce(
-    (acc: number, item: any) =>
-      acc + Number(item.discount || 0),
-
-    0,
+  const discount = round(
+    result.reduce(
+      (acc, item) =>
+        acc + Number(item.discount || 0),
+      0
+    )
   );
 
-  const total = result.reduce(
-    (acc: number, item: any) =>
-      acc + Number(item.total || 0),
-
-    0,
+  const total = round(
+    result.reduce(
+      (acc, item) =>
+        acc + Number(item.total || 0),
+      0
+    )
   );
 
   console.log("💰 SUBTOTAL:", subtotal);
@@ -929,6 +994,10 @@ export const getKardexRepository = async (body: any) => {
   console.log("🏷️ DISCOUNT:", discount);
 
   console.log("✅ TOTAL:", total);
+
+  ////////////////////////////////////////////////////////////
+  // 🔥 RETURN
+  ////////////////////////////////////////////////////////////
 
   return result;
 };
