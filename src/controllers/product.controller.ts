@@ -8,6 +8,7 @@ import {
   deleteProductRepo,
   getKardexRepo,
   getKardexRepository,
+  updateBulkRepo,
 } from "../repository/product.repository";
 import jwt from "jsonwebtoken";
 
@@ -226,7 +227,7 @@ export const updateProduct = async (req: Request, res: Response) => {
       locationId,
       lineId,
       brandName,
-      inventoryEdited
+      inventoryEdited,
     } = req.body;
 
     // ==========================================
@@ -276,7 +277,7 @@ export const updateProduct = async (req: Request, res: Response) => {
       brandName: brandName.trim(),
       stock: stock !== undefined && stock !== null ? Number(stock) : undefined,
       locationId: locationId ? Number(locationId) : undefined,
-      inventoryEdited
+      inventoryEdited,
     });
 
     return res.json(updated);
@@ -310,7 +311,7 @@ export const getKardex = async (req: Request, res: Response) => {
 
     console.log("📤 Enviando respuesta...");
 
-    return res.status(200).json(kardex); 
+    return res.status(200).json(kardex);
   } catch (error) {
     console.error("❌ Error en kardex:", error);
 
@@ -320,14 +321,9 @@ export const getKardex = async (req: Request, res: Response) => {
   }
 };
 
-export const getKardexPro = async (
-  req: Request,
-  res: Response,
-) => {
+export const getKardexPro = async (req: Request, res: Response) => {
   try {
-    const data = await getKardexRepository(
-      req.body,
-    );
+    const data = await getKardexRepository(req.body);
 
     return res.status(200).json({
       ok: true,
@@ -338,9 +334,25 @@ export const getKardexPro = async (
 
     return res.status(500).json({
       ok: false,
-      message:
-        error.message ||
-        "Error obteniendo kardex",
+      message: error.message || "Error obteniendo kardex",
+    });
+  }
+};
+
+export const updateBulk = async (req: Request, res: Response) => {
+  try {
+    const { products } = req.body;
+    const token = req.headers["x-access-token"] as string;
+
+    const user = jwt.verify(token, process.env.JWTSECRET!) as any;
+    const updated = await updateBulkRepo(products, Number(user.locationId));
+
+    return res.json(updated);
+  } catch (error) {
+    console.error("❌ Error updateProduct:", error);
+
+    return res.status(500).json({
+      message: "No se pudo actualizar el producto",
     });
   }
 };
