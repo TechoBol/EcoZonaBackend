@@ -8,7 +8,6 @@ import {
   deleteProductRepo,
   getKardexRepo,
   getKardexRepository,
-  updateBulkRepo,
 } from "../repository/product.repository";
 import jwt from "jsonwebtoken";
 
@@ -335,24 +334,6 @@ export const getKardexPro = async (req: Request, res: Response) => {
     return res.status(500).json({
       ok: false,
       message: error.message || "Error obteniendo kardex",
-    });
-  }
-};
-
-export const updateBulk = async (req: Request, res: Response) => {
-  try {
-    const { products } = req.body;
-    const token = req.headers["x-access-token"] as string;
-
-    const user = jwt.verify(token, process.env.JWTSECRET!) as any;
-    const updated = await updateBulkRepo(products, Number(user.locationId));
-
-    return res.json(updated);
-  } catch (error) {
-    console.error("❌ Error updateProduct:", error);
-
-    return res.status(500).json({
-      message: "No se pudo actualizar el producto",
     });
   }
 };
