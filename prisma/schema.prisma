@@ -32,6 +32,8 @@ model Location {
 
   fromTransfers Transfer[] @relation("FromTransfer")
   toTransfers   Transfer[] @relation("ToTransfer")
+
+  importations Importation[]
 }
 
 enum LocationType {
@@ -62,6 +64,8 @@ model Employee {
 
   requestedTransfers Transfer[] @relation("RequestedBy")
   approvedTransfers  Transfer[] @relation("ApprovedBy")
+
+  importations Importation[]
 }
 
 model Role {
@@ -109,10 +113,11 @@ model Product {
   brandName String?
   // --------------------------
 
-  inventories   Inventory[]
-  movements     StockMovement[]
-  saleDetails   SaleDetail[]
-  transferItems TransferItem[]
+  inventories      Inventory[]
+  movements        StockMovement[]
+  saleDetails      SaleDetail[]
+  transferItems    TransferItem[]
+  importationItems ImportationItem[]
 }
 
 //////////////////////
@@ -133,6 +138,58 @@ model Inventory {
   averageCost Float @default(0)
 
   @@unique([productId, locationId])
+  @@index([productId])
+  @@index([locationId])
+}
+
+enum ImportationType {
+  MANUAL
+  EXCEL
+}
+
+model Importation {
+  id Int @id @default(autoincrement())
+
+  code String
+
+  type ImportationType @default(EXCEL)
+
+  fileName String?
+  fileUrl  String?
+
+  createdAt DateTime @default(now())
+
+  employee   Employee @relation(fields: [employeeId], references: [id])
+  employeeId Int
+
+  location   Location @relation(fields: [locationId], references: [id])
+  locationId Int
+
+  items     ImportationItem[]
+  movements StockMovement[]
+
+  @@unique([code, locationId])
+  @@index([createdAt])
+  @@index([locationId])
+  @@index([employeeId])
+  @@index([type])
+}
+
+model ImportationItem {
+  id Int @id @default(autoincrement())
+
+  importation   Importation @relation(fields: [importationId], references: [id])
+  importationId Int
+
+  product   Product @relation(fields: [productId], references: [id])
+  productId Int
+
+  quantity Int
+
+  unitCost Float
+
+  @@index([importationId])
+  @@index([productId])
 }
 
 //////////////////////
@@ -159,10 +216,17 @@ model StockMovement {
   unitCost Float @default(0)
 
   // 🔥 OPCIONAL
-  reference  String?
-  transfer   Transfer? @relation(fields: [transferId], references: [id])
-  transferId Int?
-  createdAt  DateTime  @default(now())
+  reference     String?
+  transfer      Transfer?    @relation(fields: [transferId], references: [id])
+  transferId    Int?
+  importation   Importation? @relation(fields: [importationId], references: [id])
+  importationId Int?
+  createdAt     DateTime     @default(now())
+
+  @@index([productId])
+  @@index([createdAt])
+  @@index([type])
+  @@index([importationId])
 }
 
 enum MovementType {
@@ -187,10 +251,10 @@ model Transfer {
 
   status TransferStatus @default(PENDING)
 
-  createdAt DateTime @default(now())
-
+  createdAt     DateTime  @default(now())
+  editedAt      DateTime?
   requestedById Int
-  requestedBy   Employee @relation("RequestedBy", fields: [requestedById], references: [id])
+  requestedBy   Employee  @relation("RequestedBy", fields: [requestedById], references: [id])
 
   approvedById Int?
   approvedBy   Employee? @relation("ApprovedBy", fields: [approvedById], references: [id])
@@ -206,7 +270,9 @@ model Transfer {
   glosa     String?
 
   @@index([fromLocationId])
+  @@index([toLocationId])
   @@index([status])
+  @@index([createdAt])
 }
 
 model TransferItem {
@@ -219,6 +285,9 @@ model TransferItem {
   productId Int
 
   quantity Int
+
+  @@index([transferId])
+  @@index([productId])
 }
 
 enum TransferStatus {
@@ -262,19 +331,30 @@ model Sale {
   paymentMethodChanged Boolean? @default(false)
   dateChanged          Boolean? @default(false)
 
-  // NUEVOS CAMPOS
   status        SaleStatus @default(ACTIVE)
   cancelReason  String?
   cancelledAt   DateTime?
   cancelledById Int?
+
+  @@index([date])
+  @@index([locationId])
+  @@index([employeeId])
+  @@index([status])
 }
 
 model SaleDetail {
-  id        Int     @id @default(autoincrement())
-  sale      Sale    @relation(fields: [saleId], references: [id])
-  saleId    Int
+  id Int @id @default(autoincrement())
+
+  sale   Sale @relation(fields: [saleId], references: [id])
+  saleId Int
+
   product   Product @relation(fields: [productId], references: [id])
   productId Int
-  quantity  Int
-  price     Float
+
+  quantity Int
+
+  price Float
+
+  @@index([saleId])
+  @@index([productId])
 }

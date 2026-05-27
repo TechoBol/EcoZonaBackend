@@ -692,7 +692,8 @@ export const getKardexRepository = async (body: any) => {
   // 🔥 ROUND
   ////////////////////////////////////////////////////////////
 
-  const round = (value: number) => Number(value.toFixed(2));
+  const round = (value: number) =>
+    Number(Number(value || 0).toFixed(2));
 
   ////////////////////////////////////////////////////////////
   // 🔥 BODY
@@ -813,7 +814,9 @@ export const getKardexRepository = async (body: any) => {
     // 🔥 DESCUENTO TOTAL VENTA
     ////////////////////////////////////////////////////////
 
-    const saleDiscount = round(Number(sale.discount || 0));
+    const saleDiscount = round(
+      Number(sale.discount || 0),
+    );
 
     ////////////////////////////////////////////////////////
     // 🔥 ACUMULADOR DESCUENTO
@@ -825,103 +828,181 @@ export const getKardexRepository = async (body: any) => {
     // 🔥 RECORRER ITEMS
     ////////////////////////////////////////////////////////
 
-    saleItems.forEach((item: any, index: number) => {
-      ////////////////////////////////////////////////////
-      // 🔥 INFO
-      ////////////////////////////////////////////////////
+    saleItems.forEach(
+      (item: any, index: number) => {
+        ////////////////////////////////////////////////////
+        // 🔥 INFO
+        ////////////////////////////////////////////////////
 
-      const seller = `${item.sale.employee.name} ${item.sale.employee.lastName}`;
+        const seller = `${item.sale.employee.name} ${item.sale.employee.lastName}`;
 
-      const branch = item.sale.location.name;
+        const branch =
+          item.sale.location.name;
 
-      const line = item.product.line?.name || "Sin línea";
+        const line =
+          item.product.line?.name ||
+          "Sin línea";
 
-      const brand = item.product.brandName || "Sin marca";
+        const brand =
+          item.product.brandName ||
+          "Sin marca";
 
-      ////////////////////////////////////////////////////
-      // 🔥 COSTO ACTUAL
-      ////////////////////////////////////////////////////
+        ////////////////////////////////////////////////////
+        // 🔥 COSTO ACTUAL
+        ////////////////////////////////////////////////////
 
-      const price = round(Number(item.product.price || 0));
+        const price = round(
+          Number(item.product.price || 0),
+        );
 
-      ////////////////////////////////////////////////////
-      // 🔥 SUBTOTAL ITEM
-      ////////////////////////////////////////////////////
+        ////////////////////////////////////////////////////
+        // 🔥 SUBTOTAL ITEM
+        ////////////////////////////////////////////////////
 
-      const subtotal = round(Number(item.quantity) * Number(item.price));
+        const subtotal = round(
+          Number(item.quantity) *
+            Number(item.price),
+        );
 
-      ////////////////////////////////////////////////////
-      // 🔥 PRECIO VENTA HISTÓRICO
-      ////////////////////////////////////////////////////
+        ////////////////////////////////////////////////////
+        // 🔥 PRECIO VENTA HISTÓRICO
+        ////////////////////////////////////////////////////
 
-      const finalPrice = round(subtotal / Number(item.quantity || 1));
+        const finalPrice = round(
+          subtotal /
+            Number(item.quantity || 1),
+        );
 
-      ////////////////////////////////////////////////////
-      // 🔥 DESCUENTO
-      ////////////////////////////////////////////////////
+        ////////////////////////////////////////////////////
+        // 🔥 DESCUENTO
+        ////////////////////////////////////////////////////
 
-      let discount = 0;
+        let discount = 0;
 
-      const isLast = index === saleItems.length - 1;
+        const isLast =
+          index === saleItems.length - 1;
 
-      if (saleSubtotal > 0 && saleDiscount > 0) {
-        if (!isLast) {
-          discount = round((subtotal / saleSubtotal) * saleDiscount);
+        if (
+          saleSubtotal > 0 &&
+          saleDiscount > 0
+        ) {
+          if (!isLast) {
+            discount = round(
+              (subtotal / saleSubtotal) *
+                saleDiscount,
+            );
 
-          accumulatedDiscount += discount;
-        } else {
-          discount = round(saleDiscount - accumulatedDiscount);
+            accumulatedDiscount +=
+              discount;
+          } else {
+            discount = round(
+              saleDiscount -
+                accumulatedDiscount,
+            );
+          }
         }
-      }
 
-      ////////////////////////////////////////////////////
-      // 🔥 TOTAL
-      ////////////////////////////////////////////////////
+        ////////////////////////////////////////////////////
+        // 🔥 TOTAL
+        ////////////////////////////////////////////////////
 
-      const total = round(subtotal - discount);
+        const total = round(
+          subtotal - discount,
+        );
 
-      ////////////////////////////////////////////////////
-      // 🔥 PUSH
-      ////////////////////////////////////////////////////
+        ////////////////////////////////////////////////////
+        // 🔥 FECHAS
+        ////////////////////////////////////////////////////
 
-      result.push({
-        id: item.id,
+        const saleDate = new Date(
+          item.sale.date,
+        );
 
-        name: item.product.name,
+        const date =
+          saleDate.toLocaleDateString(
+            "es-BO",
+            {
+              year: "numeric",
+              month: "2-digit",
+              day: "2-digit",
+            },
+          );
 
-        product: item.product.name,
+        const month =
+          saleDate.toLocaleDateString(
+            "es-BO",
+            {
+              year: "numeric",
+              month: "long",
+            },
+          );
 
-        seller,
+        ////////////////////////////////////////////////////
+        // 🔥 PUSH
+        ////////////////////////////////////////////////////
 
-        branch,
+        result.push({
+          id: item.id,
 
-        line,
+          //////////////////////////////////////////////////
+          // 🔥 PRODUCTO
+          //////////////////////////////////////////////////
 
-        brand,
+          name: item.product.name,
 
-        barcode: item.product.barcode,
+          product: item.product.name,
 
-        quantity: Number(item.quantity),
+          barcode:
+            item.product.barcode,
 
-        //////////////////////////////////////////////////
-        // 🔥 PRECIOS
-        //////////////////////////////////////////////////
+          //////////////////////////////////////////////////
+          // 🔥 AGRUPACIONES
+          //////////////////////////////////////////////////
 
-        price,
+          seller,
 
-        finalPrice,
+          branch,
 
-        //////////////////////////////////////////////////
-        // 🔥 TOTALES
-        //////////////////////////////////////////////////
+          line,
 
-        subtotal,
+          brand,
 
-        discount,
+          //////////////////////////////////////////////////
+          // 🔥 FECHAS
+          //////////////////////////////////////////////////
 
-        total,
-      });
-    });
+          date,
+
+          month,
+
+          //////////////////////////////////////////////////
+          // 🔥 CANTIDAD
+          //////////////////////////////////////////////////
+
+          quantity: Number(
+            item.quantity || 0,
+          ),
+
+          //////////////////////////////////////////////////
+          // 🔥 PRECIOS
+          //////////////////////////////////////////////////
+
+          price,
+
+          finalPrice,
+
+          //////////////////////////////////////////////////
+          // 🔥 TOTALES
+          //////////////////////////////////////////////////
+
+          subtotal,
+
+          discount,
+
+          total,
+        });
+      },
+    );
   });
 
   ////////////////////////////////////////////////////////////
@@ -929,26 +1010,42 @@ export const getKardexRepository = async (body: any) => {
   ////////////////////////////////////////////////////////////
 
   const subtotal = round(
-    result.reduce((acc, item) => acc + Number(item.subtotal || 0), 0),
+    result.reduce(
+      (acc, item) =>
+        acc +
+        Number(item.subtotal || 0),
+      0,
+    ),
   );
 
   const discount = round(
-    result.reduce((acc, item) => acc + Number(item.discount || 0), 0),
+    result.reduce(
+      (acc, item) =>
+        acc +
+        Number(item.discount || 0),
+      0,
+    ),
   );
 
   const total = round(
-    result.reduce((acc, item) => acc + Number(item.total || 0), 0),
+    result.reduce(
+      (acc, item) =>
+        acc + Number(item.total || 0),
+      0,
+    ),
   );
 
-  console.log("💰 SUBTOTAL:", subtotal);
+  console.log(
+    "💰 SUBTOTAL:",
+    subtotal,
+  );
 
-  console.log("🏷️ DISCOUNT:", discount);
+  console.log(
+    "🏷️ DISCOUNT:",
+    discount,
+  );
 
   console.log("✅ TOTAL:", total);
-
-  ////////////////////////////////////////////////////////////
-  // 🔥 RETURN
-  ////////////////////////////////////////////////////////////
 
   ////////////////////////////////////////////////////////////
   // 🔥 AGRUPAR PRODUCTOS POR BARCODE
@@ -971,9 +1068,19 @@ export const getKardexRepository = async (body: any) => {
       groupedProducts[key] = {
         id: item.id,
 
+        //////////////////////////////////////////////////////
+        // 🔥 INFO
+        //////////////////////////////////////////////////////
+
         name: item.name,
 
         product: item.product,
+
+        barcode: item.barcode,
+
+        //////////////////////////////////////////////////////
+        // 🔥 RELACIONES
+        //////////////////////////////////////////////////////
 
         seller: item.seller,
 
@@ -983,12 +1090,19 @@ export const getKardexRepository = async (body: any) => {
 
         brand: item.brand,
 
-        barcode: item.barcode,
+        //////////////////////////////////////////////////////
+        // 🔥 ARRAYS
+        //////////////////////////////////////////////////////
 
         sellers: [],
-        branches: [],
-        lines: [],
-        brands: [],
+
+        dates: [],
+
+        details: [],
+
+        //////////////////////////////////////////////////////
+        // 🔥 TOTALES
+        //////////////////////////////////////////////////////
 
         quantity: 0,
 
@@ -998,9 +1112,11 @@ export const getKardexRepository = async (body: any) => {
 
         total: 0,
 
-        price: item.price,
+        //////////////////////////////////////////////////////
+        // 🔥 PRECIOS
+        //////////////////////////////////////////////////////
 
-        details: [],
+        price: item.price,
       };
     }
 
@@ -1008,79 +1124,144 @@ export const getKardexRepository = async (body: any) => {
     // 🔥 ACUMULAR GENERALES
     //////////////////////////////////////////////////////////
 
-    groupedProducts[key].quantity += Number(item.quantity || 0);
+    groupedProducts[key].quantity +=
+      Number(item.quantity || 0);
 
-    groupedProducts[key].subtotal = round(
-      groupedProducts[key].subtotal + Number(item.subtotal || 0),
-    );
+    groupedProducts[key].subtotal =
+      round(
+        groupedProducts[key]
+          .subtotal +
+          Number(item.subtotal || 0),
+      );
 
-    groupedProducts[key].discount = round(
-      groupedProducts[key].discount + Number(item.discount || 0),
-    );
+    groupedProducts[key].discount =
+      round(
+        groupedProducts[key]
+          .discount +
+          Number(item.discount || 0),
+      );
 
     groupedProducts[key].total = round(
-      groupedProducts[key].total + Number(item.total || 0),
+      groupedProducts[key].total +
+        Number(item.total || 0),
     );
+
+    //////////////////////////////////////////////////////////
+    // 🔥 FECHAS
+    //////////////////////////////////////////////////////////
+
+    groupedProducts[key].dates.push({
+      date: item.date,
+
+      month: item.month,
+
+      quantity: Number(
+        item.quantity || 0,
+      ),
+
+      subtotal: Number(
+        item.subtotal || 0,
+      ),
+
+      discount: Number(
+        item.discount || 0,
+      ),
+
+      total: Number(item.total || 0),
+    });
+
     //////////////////////////////////////////////////////////
     // 🔥 SELLERS
     //////////////////////////////////////////////////////////
 
-    const existingSeller = groupedProducts[key].sellers.find(
-      (seller: any) => seller.name === item.seller,
-    );
+    const existingSeller =
+      groupedProducts[key].sellers.find(
+        (seller: any) =>
+          seller.name === item.seller,
+      );
 
     if (existingSeller) {
-      existingSeller.quantity += Number(item.quantity || 0);
+      existingSeller.quantity +=
+        Number(item.quantity || 0);
 
-      existingSeller.subtotal = round(
-        existingSeller.subtotal + Number(item.subtotal || 0),
-      );
+      existingSeller.subtotal =
+        round(
+          existingSeller.subtotal +
+            Number(
+              item.subtotal || 0,
+            ),
+        );
 
-      existingSeller.discount = round(
-        existingSeller.discount + Number(item.discount || 0),
-      );
+      existingSeller.discount =
+        round(
+          existingSeller.discount +
+            Number(
+              item.discount || 0,
+            ),
+        );
 
       existingSeller.total = round(
-        existingSeller.total + Number(item.total || 0),
+        existingSeller.total +
+          Number(item.total || 0),
       );
     } else {
       groupedProducts[key].sellers.push({
         name: item.seller,
 
-        quantity: Number(item.quantity || 0),
+        quantity: Number(
+          item.quantity || 0,
+        ),
 
-        subtotal: Number(item.subtotal || 0),
+        subtotal: Number(
+          item.subtotal || 0,
+        ),
 
-        discount: Number(item.discount || 0),
+        discount: Number(
+          item.discount || 0,
+        ),
 
         total: Number(item.total || 0),
       });
     }
+
     //////////////////////////////////////////////////////////
     // 🔥 BUSCAR PRECIO
     //////////////////////////////////////////////////////////
 
-    const existingPrice = groupedProducts[key].details.find(
-      (detail: any) => Number(detail.finalPrice) === Number(item.finalPrice),
-    );
+    const existingPrice =
+      groupedProducts[key].details.find(
+        (detail: any) =>
+          Number(detail.finalPrice) ===
+          Number(item.finalPrice),
+      );
 
     //////////////////////////////////////////////////////////
     // 🔥 SI EXISTE
     //////////////////////////////////////////////////////////
 
     if (existingPrice) {
-      existingPrice.quantity += Number(item.quantity || 0);
+      existingPrice.quantity +=
+        Number(item.quantity || 0);
 
-      existingPrice.subtotal = round(
-        existingPrice.subtotal + Number(item.subtotal || 0),
-      );
+      existingPrice.subtotal =
+        round(
+          existingPrice.subtotal +
+            Number(
+              item.subtotal || 0,
+            ),
+        );
 
-      existingPrice.discount = round(
-        existingPrice.discount + Number(item.discount || 0),
-      );
+      existingPrice.discount =
+        round(
+          existingPrice.discount +
+            Number(
+              item.discount || 0,
+            ),
+        );
 
       existingPrice.total = round(
-        existingPrice.total + Number(item.total || 0),
+        existingPrice.total +
+          Number(item.total || 0),
       );
     }
 
@@ -1091,11 +1272,17 @@ export const getKardexRepository = async (body: any) => {
       groupedProducts[key].details.push({
         finalPrice: item.finalPrice,
 
-        quantity: Number(item.quantity || 0),
+        quantity: Number(
+          item.quantity || 0,
+        ),
 
-        subtotal: Number(item.subtotal || 0),
+        subtotal: Number(
+          item.subtotal || 0,
+        ),
 
-        discount: Number(item.discount || 0),
+        discount: Number(
+          item.discount || 0,
+        ),
 
         total: Number(item.total || 0),
       });
@@ -1106,7 +1293,9 @@ export const getKardexRepository = async (body: any) => {
   // 🔥 FORMATEAR
   ////////////////////////////////////////////////////////////
 
-  const finalResult = Object.values(groupedProducts).map((item: any) => ({
+  const finalResult = Object.values(
+    groupedProducts,
+  ).map((item: any) => ({
     ...item,
 
     //////////////////////////////////////////////////////////
@@ -1114,7 +1303,12 @@ export const getKardexRepository = async (body: any) => {
     //////////////////////////////////////////////////////////
 
     finalPrice: item.details
-      .map((detail: any) => `Bs ${Number(detail.finalPrice).toFixed(2)}`)
+      .map(
+        (detail: any) =>
+          `Bs ${Number(
+            detail.finalPrice,
+          ).toFixed(2)}`,
+      )
       .join(" / "),
 
     //////////////////////////////////////////////////////////
@@ -1122,7 +1316,10 @@ export const getKardexRepository = async (body: any) => {
     //////////////////////////////////////////////////////////
 
     quantityDetail: item.details
-      .map((detail: any) => `${detail.quantity}`)
+      .map(
+        (detail: any) =>
+          `${detail.quantity}`,
+      )
       .join(" / "),
 
     //////////////////////////////////////////////////////////
@@ -1130,7 +1327,12 @@ export const getKardexRepository = async (body: any) => {
     //////////////////////////////////////////////////////////
 
     subtotalDetail: item.details
-      .map((detail: any) => `Bs ${Number(detail.subtotal).toFixed(2)}`)
+      .map(
+        (detail: any) =>
+          `Bs ${Number(
+            detail.subtotal,
+          ).toFixed(2)}`,
+      )
       .join(" / "),
   }));
 
@@ -1141,7 +1343,7 @@ export const getKardexRepository = async (body: any) => {
   return finalResult;
 };
 
-export const updateBulkRepo = async (products: any[] , locationId : number) => {
+export const updateBulkRepo = async (products: any[], locationId: number) => {
   return prisma.$transaction(async (tx) => {
     for (const item of products) {
       const { id, stock, purchasePrice } = item;
