@@ -8,6 +8,7 @@ import {
   deleteProductRepo,
   getKardexRepo,
   getKardexRepository,
+  updateBulkRepo,
 } from "../repository/product.repository";
 import jwt from "jsonwebtoken";
 
