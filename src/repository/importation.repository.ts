@@ -44,9 +44,7 @@ const upsertInventory = async (
     const totalNuevo = quantity * unitCost;
     const nuevaCantidad = inventory.quantity + quantity;
     const nuevoPromedio =
-      nuevaCantidad > 0
-        ? (totalActual + totalNuevo) / nuevaCantidad
-        : unitCost;
+      nuevaCantidad > 0 ? (totalActual + totalNuevo) / nuevaCantidad : unitCost;
 
     await tx.inventory.update({
       where: {
@@ -60,7 +58,9 @@ const upsertInventory = async (
   }
 };
 
-const parseProductsFromExcel = (file: Express.Multer.File): ImportationProduct[] => {
+const parseProductsFromExcel = (
+  file: Express.Multer.File,
+): ImportationProduct[] => {
   const workbook = XLSX.read(file.buffer, { type: "buffer" });
 
   const sheetName = workbook.SheetNames[0];
@@ -72,7 +72,9 @@ const parseProductsFromExcel = (file: Express.Multer.File): ImportationProduct[]
   }
 
   return rows.map((row) => {
-    const barcode = String(row.barcode || "").trim().replace(/\s+/g, "");
+    const barcode = String(row.barcode || "")
+      .trim()
+      .replace(/\s+/g, "");
     const quantity = Number(row.quantity || 0);
     const unitCost = Number(row.unitCost || 0);
 
@@ -101,6 +103,8 @@ const processProducts = async (
 
       await upsertInventory(tx, product.id, locationId, quantity, unitCost);
 
+      await recalculateGlobalPrice(tx, product.id, quantity, unitCost);
+
       await tx.stockMovement.create({
         data: {
           productId: product.id,
@@ -124,7 +128,49 @@ const processProducts = async (
     }),
   );
 };
+const recalculateGlobalPrice = async (
+  tx: Prisma.TransactionClient,
+  productId: number,
+  newQuantity: number,
+  newUnitCost: number,
+) => {
+  const inventories = await tx.inventory.findMany({
+    where: {
+      productId,
+      quantity: {
+        gt: 0,
+      },
+    },
+  });
 
+  const product = await tx.product.findUnique({
+    where: { id: productId },
+  });
+
+  if (!product) {
+    throw new Error("Producto no encontrado");
+  }
+
+  const currentGlobalStock =
+    inventories.reduce((acc, inv) => acc + inv.quantity, 0) - newQuantity;
+
+  const currentGlobalCost = product.price;
+
+  const newGlobalStock = currentGlobalStock + newQuantity;
+
+  const newGlobalPrice =
+    newGlobalStock > 0
+      ? (currentGlobalStock * currentGlobalCost + newQuantity * newUnitCost) /
+        newGlobalStock
+      : newUnitCost;
+
+  await tx.product.update({
+    where: { id: productId },
+    data: {
+      price: Number(newGlobalPrice.toFixed(2)),
+    },
+  });
+};
 // importation.repository.ts
 export const createImportationRepo = async ({
   code,
@@ -134,51 +180,58 @@ export const createImportationRepo = async ({
   employeeId,
   locationId,
 }: CreateImportationDTO) => {
-  return prisma.$transaction(async (tx) => {
+  return prisma.$transaction(
+    async (tx) => {
+      const parsedProducts: ImportationProduct[] =
+        type === "EXCEL" ? parseProductsFromExcel(file!) : products;
 
-    const parsedProducts: ImportationProduct[] =
-      type === "EXCEL" ? parseProductsFromExcel(file!) : products;
+      if (!parsedProducts.length) {
+        throw new Error("No hay productos para procesar");
+      }
 
-    if (!parsedProducts.length) {
-      throw new Error("No hay productos para procesar");
-    }
+      const importation = await tx.importation.create({
+        data: {
+          code,
+          type,
+          fileName: type === "EXCEL" ? file!.originalname : null,
+          employeeId,
+          locationId,
+        },
+      });
 
-    const importation = await tx.importation.create({
-      data: {
-        code,
-        type,
-        fileName: type === "EXCEL" ? file!.originalname : null,
-        employeeId,
+      await processProducts(
+        tx,
+        parsedProducts,
+        importation.id,
         locationId,
-      },
-    });
+        code,
+      );
 
-    await processProducts(tx, parsedProducts, importation.id, locationId, code);
-
-    // Devolver la importación completa con los mismos includes que getImportationsRepo
-    return tx.importation.findUnique({
-      where: { id: importation.id },
-      include: {
-        employee: {
-          select: {
-            id: true,
-            name: true,
-            lastName: true,
+      // Devolver la importación completa con los mismos includes que getImportationsRepo
+      return tx.importation.findUnique({
+        where: { id: importation.id },
+        include: {
+          employee: {
+            select: {
+              id: true,
+              name: true,
+              lastName: true,
+            },
+          },
+          location: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+          _count: {
+            select: { items: true },
           },
         },
-        location: {
-          select: {
-            id: true,
-            name: true,
-          },
-        },
-        _count: {
-          select: { items: true },
-        },
-      },
-    });
-
-  }, { timeout: 30000 });
+      });
+    },
+    { timeout: 30000 },
+  );
 };
 
 export const getImportationsRepo = async (locationId: number) => {
