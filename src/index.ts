@@ -7,6 +7,8 @@ import intentorySocketInstance from './sockets/inventory.sockets'
 import locationSocketInstance from './sockets/sucursal.sockets'
 import employeeSocketInstance from './sockets/trbajador.sockets'
 import rolSocketInstance from './sockets/roles.sockets'
+import importationSocketInstance from './sockets/importation.sockets'
+
 
 config()
 
@@ -22,6 +24,7 @@ intentorySocketInstance(io)
 locationSocketInstance(io)
 employeeSocketInstance(io)
 rolSocketInstance(io)
+importationSocketInstance(io);
 
 io.on('connection', socket => {
   console.log('a user connected ' + socket.id)

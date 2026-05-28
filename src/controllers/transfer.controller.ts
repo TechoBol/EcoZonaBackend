@@ -5,6 +5,7 @@ import {
   createTransferRepo,
   getTransfersByLocationRepo,
   rejectTransferRepo,
+  updateTransferRepo,
 } from "../repository/transfer.repository";
 
 export const createTransfer = async (req: Request, res: Response) => {
@@ -26,9 +27,9 @@ export const createTransfer = async (req: Request, res: Response) => {
       glosa,
     });
     let dataAprobado
-    if (destinationId) {
+    /*if (destinationId) {
       dataAprobado = await approveTransferRepo(data.id, user.id, 1)
-    }
+    }*/
     return res.json(dataAprobado ? dataAprobado : data);
   } catch (error) {
     console.log(error);
@@ -71,11 +72,56 @@ export const rejectTransfer = async (req: Request, res: Response) => {
     const user = jwt.verify(token, process.env.JWTSECRET!) as any;
 
     const { id } = req.params;
-
-    const data = await rejectTransferRepo(Number(id), user.id);
+    const { rejectionReason } = req.body;
+    console.log (rejectionReason)
+    const data = await rejectTransferRepo(
+      Number(id),
+      user.id,
+      rejectionReason,
+    );
 
     res.json(data);
   } catch (error: any) {
     res.status(400).json({ message: error.message });
+  }
+};
+
+export const updateTransfer = async (
+  req: Request,
+  res: Response,
+) => {
+  try {
+    const token = req.headers["x-access-token"] as string;
+
+    jwt.verify(token, process.env.JWTSECRET!) as any;
+
+    const { id } = req.params;
+
+    const {
+      destinationId,
+      items,
+      glosa,
+    } = req.body;
+
+    if (!items?.length) {
+      return res.status(400).json({
+        message: "Items requeridos",
+      });
+    }
+
+    const data = await updateTransferRepo(
+      Number(id),
+      {
+        toLocationId: destinationId,
+        items,
+        glosa,
+      },
+    );
+
+    return res.json(data);
+  } catch (error: any) {
+    return res.status(400).json({
+      message: error.message,
+    });
   }
 };
