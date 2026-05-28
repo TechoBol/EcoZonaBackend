@@ -83,12 +83,13 @@ model Role {
 //////////////////////
 
 model Line {
-  id          Int       @id @default(autoincrement())
-  name        String    @unique
+  id          Int     @id @default(autoincrement())
+  name        String  @unique
   description String?
-  brands      Json      @default("[]")
-  isVisible   Boolean   @default(true)
-  products    Product[]
+  brands      Json    @default("[]")
+  isVisible   Boolean @default(true)
+
+  products Product[]
 }
 
 //////////////////////
@@ -105,13 +106,10 @@ model Product {
   finalPrice  Float
   isVisible   Boolean @default(true)
 
-  // --- Relación con Línea ---
   line   Line? @relation(fields: [lineId], references: [id])
   lineId Int?
 
-  // Nombre de la marca seleccionada (Texto simple)
   brandName String?
-  // --------------------------
 
   inventories      Inventory[]
   movements        StockMovement[]
@@ -212,7 +210,6 @@ model StockMovement {
 
   type MovementType
 
-  // 🔥 NUEVO
   unitCost Float @default(0)
 
   // 🔥 OPCIONAL
@@ -236,13 +233,13 @@ enum MovementType {
 }
 
 //////////////////////
-// 🔥 TRANSFERENCIAS (AJUSTADO)
+// 🔥 TRANSFERENCIAS
 //////////////////////
 
 model Transfer {
-  id             Int       @id @default(autoincrement())
-  transferCode   String?
-  // 🔥 AHORA OPCIONALES (CLAVE DEL CAMBIO)
+  id           Int     @id @default(autoincrement())
+  transferCode String?
+
   fromLocation   Location? @relation("FromTransfer", fields: [fromLocationId], references: [id])
   fromLocationId Int?
 
@@ -262,12 +259,12 @@ model Transfer {
   approvedAt DateTime?
   executedAt DateTime?
 
-  // 🔥 OPCIONAL (RECOMENDADO)
   rejectionReason String?
 
   items     TransferItem[]
   movements StockMovement[]
-  glosa     String?
+
+  glosa String?
 
   @@index([fromLocationId])
   @@index([toLocationId])
