@@ -33,7 +33,8 @@ model Location {
   fromTransfers Transfer[] @relation("FromTransfer")
   toTransfers   Transfer[] @relation("ToTransfer")
 
-  importations Importation[]
+  importations   Importation[]
+  InventoryCross InventoryCross[]
 }
 
 enum LocationType {
@@ -65,7 +66,8 @@ model Employee {
   requestedTransfers Transfer[] @relation("RequestedBy")
   approvedTransfers  Transfer[] @relation("ApprovedBy")
 
-  importations Importation[]
+  importations     Importation[]
+  inventoryCrosses InventoryCross[]
 }
 
 model Role {
@@ -116,6 +118,9 @@ model Product {
   saleDetails      SaleDetail[]
   transferItems    TransferItem[]
   importationItems ImportationItem[]
+  crossesFrom      InventoryCross[]  @relation("CrossOriginProduct")
+
+  crossesTo InventoryCross[] @relation("CrossDestinationProduct")
 }
 
 //////////////////////
@@ -354,4 +359,30 @@ model SaleDetail {
 
   @@index([saleId])
   @@index([productId])
+}
+
+model InventoryCross {
+  id        Int      @id @default(autoincrement())
+  code      String?
+  createdAt DateTime @default(now())
+
+  quantity Int
+
+  location   Location @relation(fields: [locationId], references: [id])
+  locationId Int
+
+  originProduct   Product @relation("CrossOriginProduct", fields: [originProductId], references: [id])
+  originProductId Int
+
+  destinationProduct   Product @relation("CrossDestinationProduct", fields: [destinationProductId], references: [id])
+  destinationProductId Int
+
+  employee   Employee @relation(fields: [employeeId], references: [id])
+  employeeId Int
+
+  observation String?
+
+  @@index([createdAt])
+  @@index([locationId])
+  @@index([employeeId])
 }

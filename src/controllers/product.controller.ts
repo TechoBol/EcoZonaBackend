@@ -8,6 +8,8 @@ import {
   deleteProductRepo,
   getKardexRepo,
   getKardexRepository,
+  crossInventoryRepo,
+  getInventoryCrossesRepo,
 } from "../repository/product.repository";
 import jwt from "jsonwebtoken";
 
@@ -334,6 +336,79 @@ export const getKardexPro = async (req: Request, res: Response) => {
     return res.status(500).json({
       ok: false,
       message: error.message || "Error obteniendo kardex",
+    });
+  }
+};
+
+export const crossInventory = async (req: Request, res: Response) => {
+  try {
+    const token = req.headers["x-access-token"] as string;
+    const user = jwt.verify(token, process.env.JWTSECRET!) as any;
+    const {
+      originProductCode,
+      destinationProductCode,
+      quantity,
+      locationId,
+      observacion,
+    } = req.body;
+
+    if (
+      !originProductCode ||
+      !destinationProductCode ||
+      !quantity ||
+      !locationId
+    ) {
+      return res.status(400).json({
+        message: "Datos incompletos",
+      });
+    }
+
+    const result = await crossInventoryRepo({
+      user: user.id,
+      originProductCode: Number(originProductCode),
+      destinationProductCode: Number(destinationProductCode),
+      quantity: Number(quantity),
+      locationId: Number(locationId),
+      observacion,
+    });
+
+    return res.status(200).json(result);
+  } catch (error: any) {
+    console.error(error);
+
+    return res.status(400).json({
+      message: error.message,
+    });
+  }
+};
+
+export const getInventoryCrosses = async (
+  req: Request,
+  res: Response,
+) => {
+  try {
+    const token = req.headers["x-access-token"] as string;
+
+    const user = jwt.verify(
+      token,
+      process.env.JWTSECRET!,
+    ) as any;
+
+    const isManagement =
+      user.level === 1 ||
+      user.level === 4;
+
+    const crosses =
+      await getInventoryCrossesRepo(
+        Number(user.locationId),
+        isManagement,
+      );
+
+    return res.json(crosses);
+  } catch (error) {
+    return res.status(500).json({
+      message:
+        "No se pudieron obtener los cruces",
     });
   }
 };

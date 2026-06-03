@@ -692,8 +692,7 @@ export const getKardexRepository = async (body: any) => {
   // 🔥 ROUND
   ////////////////////////////////////////////////////////////
 
-  const round = (value: number) =>
-    Number(Number(value || 0).toFixed(2));
+  const round = (value: number) => Number(Number(value || 0).toFixed(2));
 
   ////////////////////////////////////////////////////////////
   // 🔥 BODY
@@ -814,9 +813,7 @@ export const getKardexRepository = async (body: any) => {
     // 🔥 DESCUENTO TOTAL VENTA
     ////////////////////////////////////////////////////////
 
-    const saleDiscount = round(
-      Number(sale.discount || 0),
-    );
+    const saleDiscount = round(Number(sale.discount || 0));
 
     ////////////////////////////////////////////////////////
     // 🔥 ACUMULADOR DESCUENTO
@@ -828,181 +825,140 @@ export const getKardexRepository = async (body: any) => {
     // 🔥 RECORRER ITEMS
     ////////////////////////////////////////////////////////
 
-    saleItems.forEach(
-      (item: any, index: number) => {
-        ////////////////////////////////////////////////////
-        // 🔥 INFO
-        ////////////////////////////////////////////////////
+    saleItems.forEach((item: any, index: number) => {
+      ////////////////////////////////////////////////////
+      // 🔥 INFO
+      ////////////////////////////////////////////////////
 
-        const seller = `${item.sale.employee.name} ${item.sale.employee.lastName}`;
+      const seller = `${item.sale.employee.name} ${item.sale.employee.lastName}`;
 
-        const branch =
-          item.sale.location.name;
+      const branch = item.sale.location.name;
 
-        const line =
-          item.product.line?.name ||
-          "Sin línea";
+      const line = item.product.line?.name || "Sin línea";
 
-        const brand =
-          item.product.brandName ||
-          "Sin marca";
+      const brand = item.product.brandName || "Sin marca";
 
-        ////////////////////////////////////////////////////
-        // 🔥 COSTO ACTUAL
-        ////////////////////////////////////////////////////
+      ////////////////////////////////////////////////////
+      // 🔥 COSTO ACTUAL
+      ////////////////////////////////////////////////////
 
-        const price = round(
-          Number(item.product.price || 0),
-        );
+      const price = round(Number(item.product.price || 0));
 
-        ////////////////////////////////////////////////////
-        // 🔥 SUBTOTAL ITEM
-        ////////////////////////////////////////////////////
+      ////////////////////////////////////////////////////
+      // 🔥 SUBTOTAL ITEM
+      ////////////////////////////////////////////////////
 
-        const subtotal = round(
-          Number(item.quantity) *
-            Number(item.price),
-        );
+      const subtotal = round(Number(item.quantity) * Number(item.price));
 
-        ////////////////////////////////////////////////////
-        // 🔥 PRECIO VENTA HISTÓRICO
-        ////////////////////////////////////////////////////
+      ////////////////////////////////////////////////////
+      // 🔥 PRECIO VENTA HISTÓRICO
+      ////////////////////////////////////////////////////
 
-        const finalPrice = round(
-          subtotal /
-            Number(item.quantity || 1),
-        );
+      const finalPrice = round(subtotal / Number(item.quantity || 1));
 
-        ////////////////////////////////////////////////////
-        // 🔥 DESCUENTO
-        ////////////////////////////////////////////////////
+      ////////////////////////////////////////////////////
+      // 🔥 DESCUENTO
+      ////////////////////////////////////////////////////
 
-        let discount = 0;
+      let discount = 0;
 
-        const isLast =
-          index === saleItems.length - 1;
+      const isLast = index === saleItems.length - 1;
 
-        if (
-          saleSubtotal > 0 &&
-          saleDiscount > 0
-        ) {
-          if (!isLast) {
-            discount = round(
-              (subtotal / saleSubtotal) *
-                saleDiscount,
-            );
+      if (saleSubtotal > 0 && saleDiscount > 0) {
+        if (!isLast) {
+          discount = round((subtotal / saleSubtotal) * saleDiscount);
 
-            accumulatedDiscount +=
-              discount;
-          } else {
-            discount = round(
-              saleDiscount -
-                accumulatedDiscount,
-            );
-          }
+          accumulatedDiscount += discount;
+        } else {
+          discount = round(saleDiscount - accumulatedDiscount);
         }
+      }
 
-        ////////////////////////////////////////////////////
-        // 🔥 TOTAL
-        ////////////////////////////////////////////////////
+      ////////////////////////////////////////////////////
+      // 🔥 TOTAL
+      ////////////////////////////////////////////////////
 
-        const total = round(
-          subtotal - discount,
-        );
+      const total = round(subtotal - discount);
 
-        ////////////////////////////////////////////////////
+      ////////////////////////////////////////////////////
+      // 🔥 FECHAS
+      ////////////////////////////////////////////////////
+
+      const saleDate = new Date(item.sale.date);
+
+      const date = saleDate.toLocaleDateString("es-BO", {
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      });
+
+      const month = saleDate.toLocaleDateString("es-BO", {
+        year: "numeric",
+        month: "long",
+      });
+
+      ////////////////////////////////////////////////////
+      // 🔥 PUSH
+      ////////////////////////////////////////////////////
+
+      result.push({
+        id: item.id,
+
+        //////////////////////////////////////////////////
+        // 🔥 PRODUCTO
+        //////////////////////////////////////////////////
+
+        name: item.product.name,
+
+        product: item.product.name,
+
+        barcode: item.product.barcode,
+
+        //////////////////////////////////////////////////
+        // 🔥 AGRUPACIONES
+        //////////////////////////////////////////////////
+
+        seller,
+
+        branch,
+
+        line,
+
+        brand,
+
+        //////////////////////////////////////////////////
         // 🔥 FECHAS
-        ////////////////////////////////////////////////////
+        //////////////////////////////////////////////////
 
-        const saleDate = new Date(
-          item.sale.date,
-        );
+        date,
 
-        const date =
-          saleDate.toLocaleDateString(
-            "es-BO",
-            {
-              year: "numeric",
-              month: "2-digit",
-              day: "2-digit",
-            },
-          );
+        month,
 
-        const month =
-          saleDate.toLocaleDateString(
-            "es-BO",
-            {
-              year: "numeric",
-              month: "long",
-            },
-          );
+        //////////////////////////////////////////////////
+        // 🔥 CANTIDAD
+        //////////////////////////////////////////////////
 
-        ////////////////////////////////////////////////////
-        // 🔥 PUSH
-        ////////////////////////////////////////////////////
+        quantity: Number(item.quantity || 0),
 
-        result.push({
-          id: item.id,
+        //////////////////////////////////////////////////
+        // 🔥 PRECIOS
+        //////////////////////////////////////////////////
 
-          //////////////////////////////////////////////////
-          // 🔥 PRODUCTO
-          //////////////////////////////////////////////////
+        price,
 
-          name: item.product.name,
+        finalPrice,
 
-          product: item.product.name,
+        //////////////////////////////////////////////////
+        // 🔥 TOTALES
+        //////////////////////////////////////////////////
 
-          barcode:
-            item.product.barcode,
+        subtotal,
 
-          //////////////////////////////////////////////////
-          // 🔥 AGRUPACIONES
-          //////////////////////////////////////////////////
+        discount,
 
-          seller,
-
-          branch,
-
-          line,
-
-          brand,
-
-          //////////////////////////////////////////////////
-          // 🔥 FECHAS
-          //////////////////////////////////////////////////
-
-          date,
-
-          month,
-
-          //////////////////////////////////////////////////
-          // 🔥 CANTIDAD
-          //////////////////////////////////////////////////
-
-          quantity: Number(
-            item.quantity || 0,
-          ),
-
-          //////////////////////////////////////////////////
-          // 🔥 PRECIOS
-          //////////////////////////////////////////////////
-
-          price,
-
-          finalPrice,
-
-          //////////////////////////////////////////////////
-          // 🔥 TOTALES
-          //////////////////////////////////////////////////
-
-          subtotal,
-
-          discount,
-
-          total,
-        });
-      },
-    );
+        total,
+      });
+    });
   });
 
   ////////////////////////////////////////////////////////////
@@ -1010,40 +966,20 @@ export const getKardexRepository = async (body: any) => {
   ////////////////////////////////////////////////////////////
 
   const subtotal = round(
-    result.reduce(
-      (acc, item) =>
-        acc +
-        Number(item.subtotal || 0),
-      0,
-    ),
+    result.reduce((acc, item) => acc + Number(item.subtotal || 0), 0),
   );
 
   const discount = round(
-    result.reduce(
-      (acc, item) =>
-        acc +
-        Number(item.discount || 0),
-      0,
-    ),
+    result.reduce((acc, item) => acc + Number(item.discount || 0), 0),
   );
 
   const total = round(
-    result.reduce(
-      (acc, item) =>
-        acc + Number(item.total || 0),
-      0,
-    ),
+    result.reduce((acc, item) => acc + Number(item.total || 0), 0),
   );
 
-  console.log(
-    "💰 SUBTOTAL:",
-    subtotal,
-  );
+  console.log("💰 SUBTOTAL:", subtotal);
 
-  console.log(
-    "🏷️ DISCOUNT:",
-    discount,
-  );
+  console.log("🏷️ DISCOUNT:", discount);
 
   console.log("✅ TOTAL:", total);
 
@@ -1124,26 +1060,18 @@ export const getKardexRepository = async (body: any) => {
     // 🔥 ACUMULAR GENERALES
     //////////////////////////////////////////////////////////
 
-    groupedProducts[key].quantity +=
-      Number(item.quantity || 0);
+    groupedProducts[key].quantity += Number(item.quantity || 0);
 
-    groupedProducts[key].subtotal =
-      round(
-        groupedProducts[key]
-          .subtotal +
-          Number(item.subtotal || 0),
-      );
+    groupedProducts[key].subtotal = round(
+      groupedProducts[key].subtotal + Number(item.subtotal || 0),
+    );
 
-    groupedProducts[key].discount =
-      round(
-        groupedProducts[key]
-          .discount +
-          Number(item.discount || 0),
-      );
+    groupedProducts[key].discount = round(
+      groupedProducts[key].discount + Number(item.discount || 0),
+    );
 
     groupedProducts[key].total = round(
-      groupedProducts[key].total +
-        Number(item.total || 0),
+      groupedProducts[key].total + Number(item.total || 0),
     );
 
     //////////////////////////////////////////////////////////
@@ -1155,17 +1083,11 @@ export const getKardexRepository = async (body: any) => {
 
       month: item.month,
 
-      quantity: Number(
-        item.quantity || 0,
-      ),
+      quantity: Number(item.quantity || 0),
 
-      subtotal: Number(
-        item.subtotal || 0,
-      ),
+      subtotal: Number(item.subtotal || 0),
 
-      discount: Number(
-        item.discount || 0,
-      ),
+      discount: Number(item.discount || 0),
 
       total: Number(item.total || 0),
     });
@@ -1174,51 +1096,33 @@ export const getKardexRepository = async (body: any) => {
     // 🔥 SELLERS
     //////////////////////////////////////////////////////////
 
-    const existingSeller =
-      groupedProducts[key].sellers.find(
-        (seller: any) =>
-          seller.name === item.seller,
-      );
+    const existingSeller = groupedProducts[key].sellers.find(
+      (seller: any) => seller.name === item.seller,
+    );
 
     if (existingSeller) {
-      existingSeller.quantity +=
-        Number(item.quantity || 0);
+      existingSeller.quantity += Number(item.quantity || 0);
 
-      existingSeller.subtotal =
-        round(
-          existingSeller.subtotal +
-            Number(
-              item.subtotal || 0,
-            ),
-        );
+      existingSeller.subtotal = round(
+        existingSeller.subtotal + Number(item.subtotal || 0),
+      );
 
-      existingSeller.discount =
-        round(
-          existingSeller.discount +
-            Number(
-              item.discount || 0,
-            ),
-        );
+      existingSeller.discount = round(
+        existingSeller.discount + Number(item.discount || 0),
+      );
 
       existingSeller.total = round(
-        existingSeller.total +
-          Number(item.total || 0),
+        existingSeller.total + Number(item.total || 0),
       );
     } else {
       groupedProducts[key].sellers.push({
         name: item.seller,
 
-        quantity: Number(
-          item.quantity || 0,
-        ),
+        quantity: Number(item.quantity || 0),
 
-        subtotal: Number(
-          item.subtotal || 0,
-        ),
+        subtotal: Number(item.subtotal || 0),
 
-        discount: Number(
-          item.discount || 0,
-        ),
+        discount: Number(item.discount || 0),
 
         total: Number(item.total || 0),
       });
@@ -1228,40 +1132,27 @@ export const getKardexRepository = async (body: any) => {
     // 🔥 BUSCAR PRECIO
     //////////////////////////////////////////////////////////
 
-    const existingPrice =
-      groupedProducts[key].details.find(
-        (detail: any) =>
-          Number(detail.finalPrice) ===
-          Number(item.finalPrice),
-      );
+    const existingPrice = groupedProducts[key].details.find(
+      (detail: any) => Number(detail.finalPrice) === Number(item.finalPrice),
+    );
 
     //////////////////////////////////////////////////////////
     // 🔥 SI EXISTE
     //////////////////////////////////////////////////////////
 
     if (existingPrice) {
-      existingPrice.quantity +=
-        Number(item.quantity || 0);
+      existingPrice.quantity += Number(item.quantity || 0);
 
-      existingPrice.subtotal =
-        round(
-          existingPrice.subtotal +
-            Number(
-              item.subtotal || 0,
-            ),
-        );
+      existingPrice.subtotal = round(
+        existingPrice.subtotal + Number(item.subtotal || 0),
+      );
 
-      existingPrice.discount =
-        round(
-          existingPrice.discount +
-            Number(
-              item.discount || 0,
-            ),
-        );
+      existingPrice.discount = round(
+        existingPrice.discount + Number(item.discount || 0),
+      );
 
       existingPrice.total = round(
-        existingPrice.total +
-          Number(item.total || 0),
+        existingPrice.total + Number(item.total || 0),
       );
     }
 
@@ -1272,17 +1163,11 @@ export const getKardexRepository = async (body: any) => {
       groupedProducts[key].details.push({
         finalPrice: item.finalPrice,
 
-        quantity: Number(
-          item.quantity || 0,
-        ),
+        quantity: Number(item.quantity || 0),
 
-        subtotal: Number(
-          item.subtotal || 0,
-        ),
+        subtotal: Number(item.subtotal || 0),
 
-        discount: Number(
-          item.discount || 0,
-        ),
+        discount: Number(item.discount || 0),
 
         total: Number(item.total || 0),
       });
@@ -1293,9 +1178,7 @@ export const getKardexRepository = async (body: any) => {
   // 🔥 FORMATEAR
   ////////////////////////////////////////////////////////////
 
-  const finalResult = Object.values(
-    groupedProducts,
-  ).map((item: any) => ({
+  const finalResult = Object.values(groupedProducts).map((item: any) => ({
     ...item,
 
     //////////////////////////////////////////////////////////
@@ -1303,12 +1186,7 @@ export const getKardexRepository = async (body: any) => {
     //////////////////////////////////////////////////////////
 
     finalPrice: item.details
-      .map(
-        (detail: any) =>
-          `Bs ${Number(
-            detail.finalPrice,
-          ).toFixed(2)}`,
-      )
+      .map((detail: any) => `Bs ${Number(detail.finalPrice).toFixed(2)}`)
       .join(" / "),
 
     //////////////////////////////////////////////////////////
@@ -1316,10 +1194,7 @@ export const getKardexRepository = async (body: any) => {
     //////////////////////////////////////////////////////////
 
     quantityDetail: item.details
-      .map(
-        (detail: any) =>
-          `${detail.quantity}`,
-      )
+      .map((detail: any) => `${detail.quantity}`)
       .join(" / "),
 
     //////////////////////////////////////////////////////////
@@ -1327,12 +1202,7 @@ export const getKardexRepository = async (body: any) => {
     //////////////////////////////////////////////////////////
 
     subtotalDetail: item.details
-      .map(
-        (detail: any) =>
-          `Bs ${Number(
-            detail.subtotal,
-          ).toFixed(2)}`,
-      )
+      .map((detail: any) => `Bs ${Number(detail.subtotal).toFixed(2)}`)
       .join(" / "),
   }));
 
@@ -1341,4 +1211,249 @@ export const getKardexRepository = async (body: any) => {
   ////////////////////////////////////////////////////////////
 
   return finalResult;
+};
+
+type CrossInventoryDTO = {
+  user: number;
+  originProductCode: number;
+  destinationProductCode: number;
+  quantity: number;
+  locationId: number;
+  observacion: string;
+};
+
+export const crossInventoryRepo = async ({
+  user,
+  originProductCode,
+  destinationProductCode,
+  quantity,
+  locationId,
+  observacion,
+}: CrossInventoryDTO) => {
+  return prisma.$transaction(async (tx) => {
+    //////////////////////////////////////////////////////
+    // PRODUCTO ORIGEN
+    //////////////////////////////////////////////////////
+
+    const originInventory = await tx.inventory.findUnique({
+      where: {
+        productId_locationId: {
+          productId: originProductCode,
+          locationId,
+        },
+      },
+    });
+
+    if (!originInventory) {
+      throw new Error("Producto origen no encontrado");
+    }
+
+    if (originInventory.quantity < quantity) {
+      throw new Error("Stock insuficiente");
+    }
+
+    //////////////////////////////////////////////////////
+    // PRODUCTO DESTINO
+    //////////////////////////////////////////////////////
+
+    const destinationInventory = await tx.inventory.findUnique({
+      where: {
+        productId_locationId: {
+          productId: destinationProductCode,
+          locationId,
+        },
+      },
+    });
+
+    //////////////////////////////////////////////////////
+    // CREAR REGISTRO CRUCE
+    //////////////////////////////////////////////////////
+
+    const cross = await tx.inventoryCross.create({
+      data: {
+        employeeId: user,
+        locationId,
+        originProductId: originProductCode,
+        destinationProductId: destinationProductCode,
+        quantity,
+        observation: observacion,
+      },
+    });
+
+    const crossCode = `AINV-${cross.id}`;
+
+    const updatedCross = await tx.inventoryCross.update({
+      where: { id: cross.id },
+      data: { code: crossCode },
+      include: {
+        employee: {
+          select: {
+            id: true,
+            name: true,
+            lastName: true,
+          },
+        },
+        location: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+        originProduct: {
+          select: {
+            id: true,
+            name: true,
+            barcode: true,
+          },
+        },
+        destinationProduct: {
+          select: {
+            id: true,
+            name: true,
+            barcode: true,
+          },
+        },
+      },
+    });
+
+    //////////////////////////////////////////////////////
+    // DESCONTAR ORIGEN
+    //////////////////////////////////////////////////////
+
+    await tx.inventory.update({
+      where: {
+        productId_locationId: {
+          productId: originProductCode,
+          locationId,
+        },
+      },
+      data: {
+        quantity: {
+          decrement: quantity,
+        },
+      },
+    });
+
+    //////////////////////////////////////////////////////
+    // SUMAR DESTINO
+    //////////////////////////////////////////////////////
+
+    if (destinationInventory) {
+      await tx.inventory.update({
+        where: {
+          productId_locationId: {
+            productId: destinationProductCode,
+            locationId,
+          },
+        },
+        data: {
+          quantity: {
+            increment: quantity,
+          },
+        },
+      });
+    } else {
+      const destinationProduct = await tx.product.findUnique({
+        where: {
+          id: destinationProductCode,
+        },
+      });
+
+      await tx.inventory.create({
+        data: {
+          productId: destinationProductCode,
+          locationId,
+          quantity,
+          averageCost: destinationProduct?.price || 0,
+        },
+      });
+    }
+
+    //////////////////////////////////////////////////////
+    // MOVIMIENTO SALIDA
+    //////////////////////////////////////////////////////
+
+    await tx.stockMovement.create({
+      data: {
+        productId: originProductCode,
+        fromLocationId: locationId,
+        quantity,
+        type: "OUT",
+        reference: `AJUSTE INVENTARIO SALIDA ${crossCode}`,
+      },
+    });
+
+    //////////////////////////////////////////////////////
+    // MOVIMIENTO ENTRADA
+    //////////////////////////////////////////////////////
+
+    await tx.stockMovement.create({
+      data: {
+        productId: destinationProductCode,
+        toLocationId: locationId,
+        quantity,
+        type: "IN",
+        reference: `AJUSTE INVENTARIO ENTRADA ${crossCode}`,
+      },
+    });
+    const originCost = originInventory.averageCost;
+
+    const destinationCost = destinationInventory?.averageCost ?? 0;
+
+    return {
+      ...updatedCross,
+      originAverageCost: originCost,
+      destinationAverageCost: destinationCost,
+    };
+  });
+};
+
+export const getInventoryCrossesRepo = async (
+  locationId: number,
+  isManagement: boolean,
+) => {
+  const where = isManagement
+    ? {}
+    : {
+        locationId,
+      };
+
+  return prisma.inventoryCross.findMany({
+    where,
+    orderBy: {
+      createdAt: "desc",
+    },
+    include: {
+      employee: {
+        select: {
+          id: true,
+          name: true,
+          lastName: true,
+        },
+      },
+
+      location: {
+        select: {
+          id: true,
+          name: true,
+        },
+      },
+
+      originProduct: {
+        select: {
+          id: true,
+          name: true,
+          barcode: true,
+        },
+      },
+
+      destinationProduct: {
+        select: {
+          id: true,
+          name: true,
+          barcode: true,
+        },
+      },
+    },
+  });
 };
