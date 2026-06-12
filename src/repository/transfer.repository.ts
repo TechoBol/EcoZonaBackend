@@ -171,11 +171,7 @@ export const approveTransferRepo = async (
 ) => {
   return prisma.$transaction(
     async (tx) => {
-      ////////////////////////////////////////
-      // 🔥 OBTENER TRANSFERENCIA
-      ////////////////////////////////////////
-
-      const transfer = await tx.transfer.findUnique({
+        const transfer = await tx.transfer.findUnique({
         where: {
           id: transferId,
         },
@@ -193,10 +189,7 @@ export const approveTransferRepo = async (
       if (transfer.status !== "PENDING") {
         throw new Error("Transfer ya procesada");
       }
-
-      ////////////////////////////////////////
-      // 🔥 DESTINO
-      ////////////////////////////////////////
+      const realFromLocationId = transfer.fromLocationId ?? fromLocationId;
 
       const toLocationId = transfer.toLocationId;
 
@@ -204,16 +197,12 @@ export const approveTransferRepo = async (
         throw new Error("Location destino inválida");
       }
 
-      ////////////////////////////////////////
-      // 🔥 VALIDAR STOCK
-      ////////////////////////////////////////
-
       for (const item of transfer.items) {
         const inventory = await tx.inventory.findUnique({
           where: {
             productId_locationId: {
               productId: item.productId,
-              locationId: fromLocationId,
+              locationId: realFromLocationId,
             },
           },
         });
@@ -236,7 +225,7 @@ export const approveTransferRepo = async (
           where: {
             productId_locationId: {
               productId: item.productId,
-              locationId: fromLocationId,
+              locationId: realFromLocationId,
             },
           },
         });
@@ -259,7 +248,7 @@ export const approveTransferRepo = async (
           where: {
             productId_locationId: {
               productId: item.productId,
-              locationId: fromLocationId,
+              locationId: realFromLocationId,
             },
           },
 
@@ -345,7 +334,7 @@ export const approveTransferRepo = async (
           data: {
             productId: item.productId,
 
-            fromLocationId,
+            fromLocationId: realFromLocationId,
             toLocationId,
 
             quantity: item.quantity,
@@ -380,7 +369,7 @@ export const approveTransferRepo = async (
 
           executedAt: new Date(),
 
-          fromLocationId,
+          fromLocationId : realFromLocationId,
         },
 
         include: {
