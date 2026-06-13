@@ -763,6 +763,9 @@ export const getKardexRepository = async (body: any) => {
       saleId: "asc",
     },
   });
+  console.log("Sucursales encontradas:", [
+    ...new Set(sales.map((x) => x.sale.location.name)),
+  ]);
 
   ////////////////////////////////////////////////////////////
   // 🔥 AGRUPAR POR VENTA
@@ -1020,7 +1023,7 @@ export const getKardexRepository = async (body: any) => {
 
         seller: item.seller,
 
-        branch: item.branch,
+        branches: [],
 
         line: item.line,
 
@@ -1059,7 +1062,37 @@ export const getKardexRepository = async (body: any) => {
     //////////////////////////////////////////////////////////
     // 🔥 ACUMULAR GENERALES
     //////////////////////////////////////////////////////////
+    const existingBranch = groupedProducts[key].branches.find(
+      (branch: any) => branch.name === item.branch,
+    );
 
+    if (existingBranch) {
+      existingBranch.quantity += Number(item.quantity || 0);
+
+      existingBranch.subtotal = round(
+        existingBranch.subtotal + Number(item.subtotal || 0),
+      );
+
+      existingBranch.discount = round(
+        existingBranch.discount + Number(item.discount || 0),
+      );
+
+      existingBranch.total = round(
+        existingBranch.total + Number(item.total || 0),
+      );
+    } else {
+      groupedProducts[key].branches.push({
+        name: item.branch,
+
+        quantity: Number(item.quantity || 0),
+
+        subtotal: Number(item.subtotal || 0),
+
+        discount: Number(item.discount || 0),
+
+        total: Number(item.total || 0),
+      });
+    }
     groupedProducts[key].quantity += Number(item.quantity || 0);
 
     groupedProducts[key].subtotal = round(
