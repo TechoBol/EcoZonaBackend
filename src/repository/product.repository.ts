@@ -1490,3 +1490,53 @@ export const getInventoryCrossesRepo = async (
     },
   });
 };
+
+export const getPublicProductsRepo = async (locationId: number) => {
+  const products = await prisma.product.findMany({
+    where: {
+      isVisible: true,
+    },
+
+    select: {
+      id: true,
+      name: true,
+      barcode: true,
+      imageUrl: true,
+      finalPrice: true,
+      brandName: true,
+
+      line: {
+        select: {
+          id: true,
+          name: true,
+        },
+      },
+
+      inventories: {
+        where: {
+          locationId,
+        },
+
+        select: {
+          quantity: true,
+        },
+
+        take: 1,
+      },
+    },
+  });
+
+  return products
+    .map((product) => ({
+      id: product.id,
+      name: product.name,
+      barcode: product.barcode,
+      imageUrl: product.imageUrl,
+      finalPrice: product.finalPrice,
+      brandName: product.brandName,
+      line: product.line,
+
+      stock: product.inventories.at(0)?.quantity || 0,
+    }))
+    .sort((a, b) => b.stock - a.stock);
+};

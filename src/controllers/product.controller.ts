@@ -10,6 +10,7 @@ import {
   getKardexRepository,
   crossInventoryRepo,
   getInventoryCrossesRepo,
+  getPublicProductsRepo,
 } from "../repository/product.repository";
 import jwt from "jsonwebtoken";
 
@@ -195,6 +196,22 @@ export const getProducts = async (req: Request, res: Response) => {
   }
 };
 
+export const getPublicProducts = async (req: Request, res: Response) => {
+  try {
+    const token = req.headers["x-access-token"] as string;
+    const user = jwt.verify(token, process.env.JWTSECRET!) as any;
+
+    const products = await getPublicProductsRepo(
+      Number(user.locationId),
+    );
+
+    return res.json(products);
+  } catch {
+    return res
+      .status(500)
+      .json({ message: "No se pudieron obtener los productos" });
+  }
+};
 // GET ONE
 export const getProductById = async (req: Request, res: Response) => {
   try {
