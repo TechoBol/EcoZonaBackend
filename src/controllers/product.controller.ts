@@ -464,7 +464,7 @@ export const getValuedInventory = async (
 
     return res.json(inventory);
   } catch (error) {
-    console.error(error);
+    console.error("ERROR INVENTARIO VALORADO:", error);
 
     return res.status(500).json({
       message: "No se pudo generar el inventario valorado",
