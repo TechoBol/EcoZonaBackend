@@ -1574,11 +1574,10 @@ export const getValuedInventoryRepo = async (
       product: {
         select: {
           id: true,
-          code: true,
+          barcode: true,
           name: true,
           brandName: true,
-
-          price: true, // 👈 COSTO GLOBAL
+          price: true, // 👈 GLOBAL COSTO
 
           line: {
             select: {
@@ -1605,7 +1604,7 @@ export const getValuedInventoryRepo = async (
     return inventory.map((item) => ({
       productId: item.product.id,
 
-      codigo: item.product.code,
+      codigo: item.product.barcode,
       descripcion: item.product.name,
       linea: item.product.line?.name || "",
       marca: item.product.brandName || "",
@@ -1635,14 +1634,14 @@ export const getValuedInventoryRepo = async (
     if (!grouped.has(key)) {
       grouped.set(key, {
         productId: item.product.id,
-        codigo: item.product.code,
+        codigo: item.product.barcode,
         descripcion: item.product.name,
         linea: item.product.line?.name || "",
         marca: item.product.brandName || "",
 
         cantidad: 0,
 
-        costoUnitario: item.product.price, // 👈 COSTO GLOBAL
+        costoUnitario: item.product.price, // 👈 GLOBAL
       });
     }
 
