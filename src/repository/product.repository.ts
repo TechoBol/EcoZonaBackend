@@ -13,8 +13,24 @@ type CreateProductDTO = {
 
 // 🔥 CREAR PRODUCTO
 export const createProductRepo = async (data: CreateProductDTO) => {
+  const cost = Number(data.price);
+
+  const salePrice = Number(data.finalPrice);
+
+  const IVA = 0.1494;
+
+  const costWithIVA = cost * (1 + IVA);
+
+  const porcentajeGanancia =
+    costWithIVA > 0
+      ? Number((((salePrice - costWithIVA) / costWithIVA) * 100).toFixed(2))
+      : 0;
+
   return prisma.product.create({
-    data,
+    data: {
+      ...data,
+      porcentajeGanancia,
+    },
   });
 };
 
@@ -95,6 +111,27 @@ export const updateProductRepo = async (id: number, data: any) => {
     }
 
     // ==========================================
+    // 🔥 CALCULAR % GANANCIA
+    // ==========================================
+    const cost = Number(productData.price);
+
+    const salePrice = Number(productData.finalPrice);
+
+    const IVA = 0.1494;
+
+    const costWithIVA = cost * (1 + IVA);
+
+    const porcentajeGanancia =
+      costWithIVA > 0
+        ? Number(
+            (
+              ((salePrice - costWithIVA) / costWithIVA) *
+              100
+            ).toFixed(2)
+          )
+        : 0;
+
+    // ==========================================
     // 🔥 UPDATE PRODUCTO
     // ==========================================
     await tx.product.update({
@@ -105,20 +142,18 @@ export const updateProductRepo = async (id: number, data: any) => {
         barcode: productData.barcode,
         price: productData.price,
         finalPrice: productData.finalPrice,
+        porcentajeGanancia,
         imageUrl: productData.imageUrl,
         lineId: productData.lineId,
         brandName: productData.brandName,
       },
     });
-    if (inventoryEdited) {
-      // ==========================================
-      // 🔥 CONTROL INVENTARIO
-      // ==========================================
-      if (stock !== undefined && locationId) {
-        // =====================================================
-        // 🔥 INVENTARIO ACTUAL
-        // =====================================================
 
+    // ==========================================
+    // 🔥 CONTROL INVENTARIO
+    // ==========================================
+    if (inventoryEdited) {
+      if (stock !== undefined && locationId) {
         const inventory = await tx.inventory.findUnique({
           where: {
             productId_locationId: {
@@ -128,62 +163,27 @@ export const updateProductRepo = async (id: number, data: any) => {
           },
         });
 
-        // =====================================================
-        // 🔥 SI NO EXISTE INVENTARIO
-        // =====================================================
-
         if (!inventory) {
           await tx.inventory.create({
             data: {
               productId: id,
               locationId,
-
               quantity: stock,
-
               averageCost: productData.price,
             },
           });
 
-          // 🔥 MOVIMIENTO
           await tx.stockMovement.create({
             data: {
               productId: id,
-
               toLocationId: locationId,
-
               quantity: stock,
-
               type: "IN",
-
               unitCost: productData.price,
-
-              reference: "NUEVO INGRESO",
+              reference: "STOCK INICIAL",
             },
           });
         } else {
-          // =====================================================
-          // 🔥 PONDERADO
-          // =====================================================
-
-          const cantidadActual = inventory.quantity;
-
-          const costoActual = inventory.averageCost;
-
-          const totalActual = cantidadActual * costoActual;
-
-          const totalNuevo = stock * productData.price;
-
-          const nuevaCantidad = cantidadActual + stock;
-
-          const nuevoPromedio =
-            nuevaCantidad > 0
-              ? (totalActual + totalNuevo) / nuevaCantidad
-              : productData.price;
-
-          // =====================================================
-          // 🔥 ACTUALIZAR INVENTARIO
-          // =====================================================
-
           await tx.inventory.update({
             where: {
               productId_locationId: {
@@ -191,35 +191,31 @@ export const updateProductRepo = async (id: number, data: any) => {
                 locationId,
               },
             },
-
             data: {
-              quantity: {
-                increment: stock,
-              },
-
-              averageCost: nuevoPromedio,
-            },
-          });
-
-          // =====================================================
-          // 🔥 MOVIMIENTO HISTÓRICO
-          // =====================================================
-
-          await tx.stockMovement.create({
-            data: {
-              productId: id,
-
-              toLocationId: locationId,
-
               quantity: stock,
-
-              type: "IN",
-
-              unitCost: productData.price,
-
-              reference: "REPOSICION STOCK",
+              averageCost: productData.price,
             },
           });
+
+          const initialMovement = await tx.stockMovement.findFirst({
+            where: {
+              productId: id,
+              toLocationId: locationId,
+              reference: "STOCK INICIAL",
+            },
+          });
+
+          if (initialMovement) {
+            await tx.stockMovement.update({
+              where: {
+                id: initialMovement.id,
+              },
+              data: {
+                quantity: stock,
+                unitCost: productData.price,
+              },
+            });
+          }
         }
       }
     }
@@ -1539,4 +1535,187 @@ export const getPublicProductsRepo = async (locationId: number) => {
       stock: product.inventories.at(0)?.quantity || 0,
     }))
     .sort((a, b) => b.stock - a.stock);
+};
+
+export const getValuedInventoryRepo = async (
+  locationId?: number,
+  productId?: number,
+  lineId?: number,
+  brand?: string,
+) => {
+  const where: any = {
+    quantity: {
+      gt: 0,
+    },
+  };
+
+  ////////////////////////////////////////////
+  // FILTROS
+  ////////////////////////////////////////////
+
+  if (locationId) {
+    where.locationId = locationId;
+  }
+
+  if (productId) {
+    where.productId = productId;
+  }
+
+  const productWhere: any = {};
+
+  if (lineId) {
+    productWhere.lineId = lineId;
+  }
+
+  if (brand) {
+    productWhere.brandName = brand;
+  }
+
+  ////////////////////////////////////////////
+  // CONSULTA
+  ////////////////////////////////////////////
+
+  const inventory =
+    await prisma.inventory.findMany({
+      where: {
+        ...where,
+
+        ...(Object.keys(productWhere).length > 0
+          ? {
+              product: productWhere,
+            }
+          : {}),
+      },
+
+      include: {
+        location: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+
+        product: {
+          include: {
+            line: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+          },
+        },
+      },
+
+      orderBy: {
+        product: {
+          name: "asc",
+        },
+      },
+    });
+
+  ////////////////////////////////////////////
+  // SUCURSAL ESPECIFICA
+  ////////////////////////////////////////////
+
+  if (locationId) {
+    return inventory.map((item) => ({
+      productId: item.product.id,
+
+      codigo:
+        item.product.barcode,
+
+      descripcion:
+        item.product.name,
+
+      linea:
+        item.product.line?.name ||
+        "",
+
+      marca:
+        item.product.brandName ||
+        "",
+
+      cantidad:
+        item.quantity,
+
+      costoUnitario:
+        item.averageCost,
+
+      valor:
+        item.quantity *
+        item.averageCost,
+
+      locationId:
+        item.location.id,
+
+      locationName:
+        item.location.name,
+    }));
+  }
+
+  ////////////////////////////////////////////
+  // TODAS LAS SUCURSALES
+  ////////////////////////////////////////////
+
+  const grouped = new Map();
+
+  inventory.forEach((item) => {
+    const key = item.product.id;
+
+    if (!grouped.has(key)) {
+      grouped.set(key, {
+        productId:
+          item.product.id,
+
+        codigo:
+          item.product.barcode,
+
+        descripcion:
+          item.product.name,
+
+        linea:
+          item.product.line?.name ||
+          "",
+
+        marca:
+          item.product.brandName ||
+          "",
+
+        cantidad: 0,
+
+        valor: 0,
+      });
+    }
+
+    const current =
+      grouped.get(key);
+
+    current.cantidad +=
+      item.quantity;
+
+    current.valor +=
+      item.quantity *
+      item.averageCost;
+  });
+
+  return Array.from(
+    grouped.values(),
+  ).map((item: any) => ({
+    ...item,
+
+    costoUnitario:
+      item.cantidad > 0
+        ? Number(
+            (
+              item.valor /
+              item.cantidad
+            ).toFixed(2),
+          )
+        : 0,
+
+    valor: Number(
+      item.valor.toFixed(2),
+    ),
+  }));
 };

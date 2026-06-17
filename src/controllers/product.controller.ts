@@ -11,6 +11,7 @@ import {
   crossInventoryRepo,
   getInventoryCrossesRepo,
   getPublicProductsRepo,
+  getValuedInventoryRepo,
 } from "../repository/product.repository";
 import jwt from "jsonwebtoken";
 
@@ -426,6 +427,49 @@ export const getInventoryCrosses = async (
     return res.status(500).json({
       message:
         "No se pudieron obtener los cruces",
+    });
+  }
+};
+
+export const getValuedInventory = async (
+  req: Request,
+  res: Response,
+) => {
+  try {
+    const {
+      locationId,
+      productId,
+      lineId,
+      brand,
+    } = req.body;
+
+    const inventory =
+      await getValuedInventoryRepo(
+        locationId
+          ? Number(locationId)
+          : undefined,
+
+        productId
+          ? Number(productId)
+          : undefined,
+
+        lineId
+          ? Number(lineId)
+          : undefined,
+
+        brand &&
+          brand !== "TODAS"
+          ? brand
+          : undefined,
+      );
+
+    return res.json(inventory);
+  } catch (error) {
+    console.error(error);
+
+    return res.status(500).json({
+      message:
+        "No se pudo generar el inventario valorado",
     });
   }
 };
