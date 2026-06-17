@@ -33,8 +33,9 @@ model Location {
   fromTransfers Transfer[] @relation("FromTransfer")
   toTransfers   Transfer[] @relation("ToTransfer")
 
-  importations   Importation[]
-  InventoryCross InventoryCross[]
+  importations        Importation[]
+  PublicInventoryLink PublicInventoryLink[]
+  InventoryCross      InventoryCross[]
 }
 
 enum LocationType {
@@ -66,8 +67,9 @@ model Employee {
   requestedTransfers Transfer[] @relation("RequestedBy")
   approvedTransfers  Transfer[] @relation("ApprovedBy")
 
-  importations     Importation[]
-  inventoryCrosses InventoryCross[]
+  importations        Importation[]
+  PublicInventoryLink PublicInventoryLink[]
+  inventoryCrosses    InventoryCross[]
 }
 
 model Role {
@@ -330,13 +332,19 @@ model Sale {
 
   typeSale             String?
   transactionNumber    String?
-  paymentMethodChanged Boolean? @default(false)
-  dateChanged          Boolean? @default(false)
+  paymentMethodChanged Boolean?   @default(false)
+  dateChanged          Boolean?   @default(false)
+  type                 String?
+  status               SaleStatus @default(ACTIVE)
+  cancelReason         String?
+  cancelledAt          DateTime?
+  cancelledById        Int?
 
-  status        SaleStatus @default(ACTIVE)
-  cancelReason  String?
-  cancelledAt   DateTime?
-  cancelledById Int?
+  customerName     String?
+  customerPhone    String?
+  customerDocument String?
+  customerAddress  String?
+  customerNote     String?
 
   @@index([date])
   @@index([locationId])
@@ -385,4 +393,22 @@ model InventoryCross {
   @@index([createdAt])
   @@index([locationId])
   @@index([employeeId])
+}
+
+model PublicInventoryLink {
+  id Int @id @default(autoincrement())
+
+  token String @unique
+
+  employee   Employee @relation(fields: [employeeId], references: [id])
+  employeeId Int
+
+  location   Location @relation(fields: [locationId], references: [id])
+  locationId Int
+
+  active Boolean @default(true)
+
+  createdAt DateTime @default(now())
+
+  views Int @default(0)
 }
