@@ -1544,119 +1544,88 @@ export const getValuedInventoryRepo = async (
   brand?: string,
 ) => {
   const where: any = {
-    quantity: {
-      gt: 0,
-    },
+    quantity: { gt: 0 },
   };
 
-  ////////////////////////////////////////////
-  // FILTROS
-  ////////////////////////////////////////////
-
-  if (locationId) {
-    where.locationId = locationId;
-  }
-
-  if (productId) {
-    where.productId = productId;
-  }
+  if (locationId) where.locationId = locationId;
+  if (productId) where.productId = productId;
 
   const productWhere: any = {};
 
-  if (lineId) {
-    productWhere.lineId = lineId;
-  }
+  if (lineId) productWhere.lineId = lineId;
+  if (brand) productWhere.brandName = brand;
 
-  if (brand) {
-    productWhere.brandName = brand;
-  }
+  const inventory = await prisma.inventory.findMany({
+    where: {
+      ...where,
+      ...(Object.keys(productWhere).length > 0
+        ? { product: productWhere }
+        : {}),
+    },
 
-  ////////////////////////////////////////////
-  // CONSULTA
-  ////////////////////////////////////////////
-
-  const inventory =
-    await prisma.inventory.findMany({
-      where: {
-        ...where,
-
-        ...(Object.keys(productWhere).length > 0
-          ? {
-              product: productWhere,
-            }
-          : {}),
+    include: {
+      location: {
+        select: {
+          id: true,
+          name: true,
+        },
       },
 
-      include: {
-        location: {
-          select: {
-            id: true,
-            name: true,
-          },
-        },
+      product: {
+        select: {
+          id: true,
+          code: true,
+          name: true,
+          brandName: true,
 
-        product: {
-          include: {
-            line: {
-              select: {
-                id: true,
-                name: true,
-              },
+          price: true, // 👈 COSTO GLOBAL
+
+          line: {
+            select: {
+              id: true,
+              name: true,
             },
           },
         },
       },
+    },
 
-      orderBy: {
-        product: {
-          name: "asc",
-        },
+    orderBy: {
+      product: {
+        name: "asc",
       },
-    });
+    },
+  });
 
-  ////////////////////////////////////////////
-  // SUCURSAL ESPECIFICA
-  ////////////////////////////////////////////
+  //////////////////////////////////////////////////////
+  // 🏢 SUCURSAL ESPECÍFICA
+  //////////////////////////////////////////////////////
 
   if (locationId) {
     return inventory.map((item) => ({
       productId: item.product.id,
 
-      codigo:
-        item.product.barcode,
+      codigo: item.product.code,
+      descripcion: item.product.name,
+      linea: item.product.line?.name || "",
+      marca: item.product.brandName || "",
 
-      descripcion:
-        item.product.name,
+      unidad: "BASE",
 
-      linea:
-        item.product.line?.name ||
-        "",
+      cantidad: item.quantity,
 
-      marca:
-        item.product.brandName ||
-        "",
+      costoUnitario: Number(item.averageCost),
 
-      cantidad:
-        item.quantity,
+      valor: Number(item.quantity * item.averageCost),
 
-      costoUnitario:
-        item.averageCost,
-
-      valor:
-        item.quantity *
-        item.averageCost,
-
-      locationId:
-        item.location.id,
-
-      locationName:
-        item.location.name,
+      locationId: item.location.id,
+      locationName: item.location.name,
     }));
   }
 
-  ////////////////////////////////////////////
-  // TODAS LAS SUCURSALES
-  ////////////////////////////////////////////
+  //////////////////////////////////////////////////////
+  // 🌎 TODAS LAS SUCURSALES
+  //////////////////////////////////////////////////////
 
   const grouped = new Map();
 
@@ -1665,57 +1634,34 @@ export const getValuedInventoryRepo = async (
 
     if (!grouped.has(key)) {
       grouped.set(key, {
-        productId:
-          item.product.id,
-
-        codigo:
-          item.product.barcode,
-
-        descripcion:
-          item.product.name,
-
-        linea:
-          item.product.line?.name ||
-          "",
-
-        marca:
-          item.product.brandName ||
-          "",
+        productId: item.product.id,
+        codigo: item.product.code,
+        descripcion: item.product.name,
+        linea: item.product.line?.name || "",
+        marca: item.product.brandName || "",
 
         cantidad: 0,
 
-        valor: 0,
+        costoUnitario: item.product.price, // 👈 COSTO GLOBAL
       });
     }
 
-    const current =
-      grouped.get(key);
+    const current = grouped.get(key);
 
-    current.cantidad +=
-      item.quantity;
-
-    current.valor +=
-      item.quantity *
-      item.averageCost;
+    current.cantidad += item.quantity;
   });
 
-  return Array.from(
-    grouped.values(),
-  ).map((item: any) => ({
-    ...item,
+  return Array.from(grouped.values()).map((item: any) => ({
+    productId: item.productId,
+    codigo: item.codigo,
+    descripcion: item.descripcion,
+    linea: item.linea,
+    marca: item.marca,
 
-    costoUnitario:
-      item.cantidad > 0
-        ? Number(
-            (
-              item.valor /
-              item.cantidad
-            ).toFixed(2),
-          )
-        : 0,
+    cantidad: Number(item.cantidad),
 
-    valor: Number(
-      item.valor.toFixed(2),
-    ),
+    costoUnitario: Number(item.costoUnitario),
+
+    valor: Number(item.cantidad * item.costoUnitario),
   }));
 };
