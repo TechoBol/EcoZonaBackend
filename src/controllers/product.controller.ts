@@ -445,20 +445,19 @@ export const getValuedInventory = async (
 
     const inventory =
       await getValuedInventoryRepo(
-        locationId
+        locationId && Number(locationId) > 0
           ? Number(locationId)
           : undefined,
 
-        productId
+        productId && Number(productId) > 0
           ? Number(productId)
           : undefined,
 
-        lineId
+        lineId && Number(lineId) > 0
           ? Number(lineId)
           : undefined,
 
-        brand &&
-          brand !== "TODAS"
+        brand && brand !== "TODAS"
           ? brand
           : undefined,
       );
@@ -468,8 +467,7 @@ export const getValuedInventory = async (
     console.error(error);
 
     return res.status(500).json({
-      message:
-        "No se pudo generar el inventario valorado",
+      message: "No se pudo generar el inventario valorado",
     });
   }
 };
