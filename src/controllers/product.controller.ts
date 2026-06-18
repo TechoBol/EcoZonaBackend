@@ -431,7 +431,10 @@ export const getInventoryCrosses = async (
   }
 };
 
-export const getValuedInventory = async (req: Request, res: Response) => {
+export const getValuedInventory = async (
+  req: Request,
+  res: Response,
+) => {
   try {
     const {
       locationId,
@@ -441,20 +444,46 @@ export const getValuedInventory = async (req: Request, res: Response) => {
       hasta,
     } = req.body;
 
-    const inventory = await getValuedInventoryRepo(
-      locationId && Number(locationId) > 0 ? Number(locationId) : undefined,
-      productId && Number(productId) > 0 ? Number(productId) : undefined,
-      lineId && Number(lineId) > 0 ? Number(lineId) : undefined,
-      brand && brand !== "TODAS" ? brand : undefined,
-      hasta ? new Date(hasta) : undefined,
-    );
+    const inventory =
+      await getValuedInventoryRepo(
+        locationId && Number(locationId) > 0
+          ? Number(locationId)
+          : undefined,
+
+        productId && Number(productId) > 0
+          ? Number(productId)
+          : undefined,
+
+        lineId && Number(lineId) > 0
+          ? Number(lineId)
+          : undefined,
+
+        brand && brand !== "TODAS"
+          ? brand
+          : undefined,
+
+        hasta
+          ? new Date(
+              new Date(hasta).setHours(
+                23,
+                59,
+                59,
+                999,
+              ),
+            )
+          : undefined,
+      );
 
     return res.json(inventory);
   } catch (error) {
-    console.error("ERROR INVENTARIO VALORADO:", error);
+    console.error(
+      "ERROR INVENTARIO VALORADO:",
+      error,
+    );
 
     return res.status(500).json({
-      message: "No se pudo generar el inventario valorado",
+      message:
+        "No se pudo generar el inventario valorado",
     });
   }
 };

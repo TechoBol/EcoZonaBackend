@@ -1539,21 +1539,23 @@ export const getValuedInventoryRepo = async (
   brand?: string,
   hasta?: Date,
 ) => {
+  //////////////////////////////////////////////////////
+  // MOVIMIENTOS HASTA FECHA
+  //////////////////////////////////////////////////////
+
   const movements = await prisma.stockMovement.findMany({
     where: {
-      ...(productId ? { productId } : {}),
+      ...(productId && {
+        productId,
+      }),
 
-      ...(locationId
-        ? {
-            OR: [
-              { toLocationId: locationId },
-              { fromLocationId: locationId },
-            ],
-          }
-        : {}),
-
-      ...(hasta ? { createdAt: { lte: hasta } } : {}),
+      ...(hasta && {
+        createdAt: {
+          lte: hasta,
+        },
+      }),
     },
+
     include: {
       product: {
         include: {
@@ -1561,86 +1563,164 @@ export const getValuedInventoryRepo = async (
         },
       },
     },
+
     orderBy: {
       createdAt: "asc",
     },
   });
 
-  const map = new Map();
+  const grouped = new Map<number, any>();
 
-  movements.forEach((m) => {
-    const p = m.product;
+  //////////////////////////////////////////////////////
+  // RECONSTRUIR STOCK HISTÓRICO
+  //////////////////////////////////////////////////////
 
-    // filtros adicionales
-    if (lineId && p.lineId !== lineId) return;
-    if (brand && p.brandName !== brand) return;
+  for (const movement of movements) {
+    const product = movement.product;
 
-    const key = p.id;
+    if (lineId && product.lineId !== lineId) continue;
 
-    if (!map.has(key)) {
-      map.set(key, {
-        productId: p.id,
-        codigo: p.barcode,
-        descripcion: p.name,
-        linea: p.line?.name || "",
-        marca: p.brandName || "",
+    if (brand && product.brandName !== brand) continue;
+
+    if (!grouped.has(product.id)) {
+      grouped.set(product.id, {
+        productId: product.id,
+
+        codigo: product.barcode,
+
+        descripcion: product.name,
+
+        linea: product.line?.name || "",
+
+        marca: product.brandName || "",
+
         cantidad: 0,
 
-        // 👇 AQUÍ VA LA REGLA DE COSTO
-        costoUnitario: locationId
-          ? 0 // se setea después
-          : Number(p.price),
+        precioProducto: Number(product.price),
       });
     }
 
-    const item = map.get(key);
+    const item = grouped.get(product.id);
 
-    if (m.type === "IN") {
-      item.cantidad += m.quantity;
-    }
+    //////////////////////////////////////////////////////
+    // TODAS LAS SUCURSALES
+    //////////////////////////////////////////////////////
 
-    if (m.type === "OUT") {
-      item.cantidad -= m.quantity;
-    }
-  });
+    if (!locationId) {
+      switch (movement.type) {
+        case "IN":
+          item.cantidad += movement.quantity;
+          break;
 
-  //////////////////////////////////////////////////////
-  // 🧠 AJUSTE FINAL DE COSTOS POR REGLA
-  //////////////////////////////////////////////////////
+        case "OUT":
+          item.cantidad -= movement.quantity;
+          break;
 
-  const results = await Promise.all(
-    Array.from(map.values()).map(async (item) => {
-      let costoUnitario = 0;
-
-      if (locationId) {
-        // 🏢 SUCURSAL ESPECÍFICA → INVENTORY
-        const inventory = await prisma.inventory.findUnique({
-          where: {
-            productId_locationId: {
-              productId: item.productId,
-              locationId,
-            },
-          },
-        });
-
-        costoUnitario = inventory?.averageCost || 0;
-      } else {
-        // 🌎 TODAS → PRODUCTO
-        const product = await prisma.product.findUnique({
-          where: { id: item.productId },
-          select: { price: true },
-        });
-
-        costoUnitario = product?.price || 0;
+        case "TRANSFER":
+          // No modifica stock global
+          break;
       }
 
-      return {
-        ...item,
-        costoUnitario,
-        valor: item.cantidad * costoUnitario,
-      };
-    }),
-  );
+      continue;
+    }
 
-  return results;
+    //////////////////////////////////////////////////////
+    // SUCURSAL ESPECÍFICA
+    //////////////////////////////////////////////////////
+
+    switch (movement.type) {
+      case "IN":
+        if (movement.toLocationId === locationId) {
+          item.cantidad += movement.quantity;
+        }
+        break;
+
+      case "OUT":
+        if (movement.fromLocationId === locationId) {
+          item.cantidad -= movement.quantity;
+        }
+        break;
+
+      case "TRANSFER":
+        if (movement.fromLocationId === locationId) {
+          item.cantidad -= movement.quantity;
+        }
+
+        if (movement.toLocationId === locationId) {
+          item.cantidad += movement.quantity;
+        }
+        break;
+    }
+  }
+
+  //////////////////////////////////////////////////////
+  // COSTOS DE INVENTARIO POR SUCURSAL
+  //////////////////////////////////////////////////////
+
+  let inventoryCostMap = new Map<number, number>();
+
+  if (locationId) {
+    const inventories = await prisma.inventory.findMany({
+      where: {
+        locationId,
+
+        productId: {
+          in: Array.from(grouped.keys()),
+        },
+      },
+
+      select: {
+        productId: true,
+        averageCost: true,
+      },
+    });
+
+    inventoryCostMap = new Map(
+      inventories.map((i) => [
+        i.productId,
+        Number(i.averageCost),
+      ]),
+    );
+  }
+
+  //////////////////////////////////////////////////////
+  // RESULTADO FINAL
+  //////////////////////////////////////////////////////
+
+  return Array.from(grouped.values())
+    .filter((item) => item.cantidad > 0)
+    .map((item) => {
+      ////////////////////////////////////////////////////
+      // SUCURSAL -> COSTO PROMEDIO DEL INVENTARIO
+      ////////////////////////////////////////////////////
+
+      const costoUnitario = locationId
+        ? inventoryCostMap.get(item.productId) || 0
+        : Number(item.precioProducto);
+
+      ////////////////////////////////////////////////////
+      // TODAS -> COSTO DEL PRODUCTO
+      ////////////////////////////////////////////////////
+
+      return {
+        productId: item.productId,
+
+        codigo: item.codigo,
+
+        descripcion: item.descripcion,
+
+        linea: item.linea,
+
+        marca: item.marca,
+
+        cantidad: Number(item.cantidad),
+
+        costoUnitario: Number(costoUnitario),
+
+        valor: Number(item.cantidad * costoUnitario),
+      };
+    })
+    .sort((a, b) =>
+      a.descripcion.localeCompare(b.descripcion),
+    );
 };
