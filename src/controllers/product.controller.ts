@@ -431,36 +431,23 @@ export const getInventoryCrosses = async (
   }
 };
 
-export const getValuedInventory = async (
-  req: Request,
-  res: Response,
-) => {
+export const getValuedInventory = async (req: Request, res: Response) => {
   try {
     const {
       locationId,
       productId,
       lineId,
       brand,
+      hasta,
     } = req.body;
 
-    const inventory =
-      await getValuedInventoryRepo(
-        locationId && Number(locationId) > 0
-          ? Number(locationId)
-          : undefined,
-
-        productId && Number(productId) > 0
-          ? Number(productId)
-          : undefined,
-
-        lineId && Number(lineId) > 0
-          ? Number(lineId)
-          : undefined,
-
-        brand && brand !== "TODAS"
-          ? brand
-          : undefined,
-      );
+    const inventory = await getValuedInventoryRepo(
+      locationId && Number(locationId) > 0 ? Number(locationId) : undefined,
+      productId && Number(productId) > 0 ? Number(productId) : undefined,
+      lineId && Number(lineId) > 0 ? Number(lineId) : undefined,
+      brand && brand !== "TODAS" ? brand : undefined,
+      hasta ? new Date(hasta) : undefined,
+    );
 
     return res.json(inventory);
   } catch (error) {
