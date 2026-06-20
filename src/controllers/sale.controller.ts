@@ -15,20 +15,44 @@ import jwt from "jsonwebtoken";
 
 export const createSale = async (req: Request, res: Response) => {
   try {
-    const { locationId, products, codigoTransaccion, metodoPago, discount } =
-      req.body;
+    const {
+      locationId: bodyLocationId,
+      products,
+      codigoTransaccion,
+      metodoPago,
+      discount,
+
+      customerName,
+      customerPhone,
+      customerDocument,
+      customerAddress,
+      customerNote,
+    } = req.body;
 
     const token = req.headers["x-access-token"] as string;
 
+    if (!token) {
+      return res.status(401).json({
+        message: "Token requerido",
+      });
+    }
+
     const user = jwt.verify(token, process.env.JWTSECRET!) as any;
+
+    const locationId = bodyLocationId || user.locationId;
+
+    if (!locationId) {
+      return res.status(400).json({
+        message: "locationId requerido",
+      });
+    }
+
+    const employeeId = user.id || user.sellerId;
 
     const sale = await prisma.$transaction(
       async (tx) => {
         let subtotal = 0;
 
-        // =====================================================
-        // 🔥 VALIDAR STOCK
-        // =====================================================
         for (const item of products) {
           const inventory = await getInventoryRepo(
             tx,
@@ -41,41 +65,36 @@ export const createSale = async (req: Request, res: Response) => {
           }
         }
 
-        // =====================================================
-        // 🔥 INCREMENTAR CONTADOR
-        // =====================================================
         const location = await incrementLocationCounterRepo(tx, locationId);
 
         const saleNumber = location.saleCounter;
 
         const code = `${location.abbreviation}-${saleNumber}`;
 
-        // =====================================================
-        // 🔥 CREAR VENTA
-        // =====================================================
-        const newSale = await createSaleRepo(tx, {
-          employeeId: user.id,
+        const type = user.sellerId ? "Online" : "Privado";
 
+        const newSale = await createSaleRepo(tx, {
+          employeeId,
           locationId,
 
           subtotal: 0,
-
           discount: 0,
-
           total: 0,
 
           code,
-
           pdfUrl: `ECOZONA/SALES/${code}.pdf`,
 
           typeSale: metodoPago,
-
           transactionNumber: codigoTransaccion,
+          type,
+
+          customerName,
+          customerPhone,
+          customerDocument,
+          customerAddress,
+          customerNote,
         });
 
-        // =====================================================
-        // 🔥 DETALLES + INVENTARIO + KARDEX
-        // =====================================================
         for (const item of products) {
           const product = await getProductRepo(tx, item.productId);
 
@@ -83,9 +102,10 @@ export const createSale = async (req: Request, res: Response) => {
             throw new Error("product not found");
           }
 
-          // ==========================================
-          // 🔥 INVENTARIO ACTUAL
-          // ==========================================
+          ///////////////////////////////////////////
+          // INVENTARIO
+          ///////////////////////////////////////////
+
           const inventory = await tx.inventory.findUnique({
             where: {
               productId_locationId: {
@@ -99,16 +119,18 @@ export const createSale = async (req: Request, res: Response) => {
             throw new Error("inventory not found");
           }
 
-          // ==========================================
-          // 🔥 PRECIO VENTA
-          // ==========================================
+          ///////////////////////////////////////////
+          // PRECIO
+          ///////////////////////////////////////////
+
           const price = product.finalPrice;
 
           subtotal += price * item.quantity;
 
-          // ==========================================
-          // 🔥 DETALLE VENTA
-          // ==========================================
+          ///////////////////////////////////////////
+          // DETALLE
+          ///////////////////////////////////////////
+
           await createSaleDetailRepo(tx, {
             saleId: newSale.id,
 
@@ -119,9 +141,10 @@ export const createSale = async (req: Request, res: Response) => {
             price,
           });
 
-          // ==========================================
-          // 🔥 DESCONTAR INVENTARIO
-          // ==========================================
+          ///////////////////////////////////////////
+          // DESCONTAR INVENTARIO
+          ///////////////////////////////////////////
+
           await updateInventoryRepo(
             tx,
             item.productId,
@@ -129,9 +152,10 @@ export const createSale = async (req: Request, res: Response) => {
             item.quantity,
           );
 
-          // ==========================================
-          // 🔥 MOVIMIENTO KARDEX
-          // ==========================================
+          ///////////////////////////////////////////
+          // KARDEX
+          ///////////////////////////////////////////
+
           await tx.stockMovement.create({
             data: {
               productId: item.productId,
@@ -142,7 +166,6 @@ export const createSale = async (req: Request, res: Response) => {
 
               type: "OUT",
 
-              // 🔥 COSTO PROMEDIO REAL
               unitCost: inventory.averageCost || product.price,
 
               reference: `VENTA ${code}`,
@@ -151,8 +174,9 @@ export const createSale = async (req: Request, res: Response) => {
         }
 
         // =====================================================
-        // 🔥 ACTUALIZAR TOTAL
+        // ACTUALIZAR TOTAL
         // =====================================================
+
         await updateSaleTotalRepo(tx, newSale.id, {
           subtotal,
 
@@ -162,8 +186,9 @@ export const createSale = async (req: Request, res: Response) => {
         });
 
         // =====================================================
-        // 🔥 OBTENER VENTA COMPLETA
+        // OBTENER VENTA COMPLETA
         // =====================================================
+
         const fullSale = await tx.sale.findUnique({
           where: {
             id: newSale.id,
@@ -172,7 +197,12 @@ export const createSale = async (req: Request, res: Response) => {
           include: {
             location: true,
 
-            employee: true,
+            employee: {
+              select: {
+                name: true,
+                lastName: true,
+              },
+            },
 
             details: {
               include: {
@@ -315,10 +345,7 @@ export const updateSaleDate = async (req: Request, res: Response) => {
   }
 };
 
-export const cancelSale = async (
-  req: Request,
-  res: Response,
-) => {
+export const cancelSale = async (req: Request, res: Response) => {
   try {
     const saleId = Number(req.params.id);
 
@@ -333,11 +360,7 @@ export const cancelSale = async (
       });
     }
 
-    const sale = await cancelSaleRepo(
-      saleId,
-      reason,
-      user.id,
-    );
+    const sale = await cancelSaleRepo(saleId, reason, user.id);
 
     return res.json(sale);
   } catch (error: any) {
