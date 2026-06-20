@@ -14,6 +14,7 @@ import roleRoute from "../routes/role.routes";
 import transferRoute from "../routes/transferencias.routes";
 import lineRoute from "../routes/line.routes";
 import importationRoute from "../routes/importation.routes";
+import productDetailRoute  from '../routes/productDetail.routes';
 
 const app = express();
 
@@ -32,5 +33,6 @@ app.use("/api/role", verifyToken, roleRoute);
 app.use("/api/transfer", verifyToken, transferRoute);
 app.use("/api/line", verifyToken, lineRoute);
 app.use("/api/importation", verifyToken, importationRoute);
+app.use('/api/productDetail', verifyToken, productDetailRoute);
 
 export default app;

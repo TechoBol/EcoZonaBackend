@@ -441,6 +441,7 @@ export const getValuedInventory = async (
       productId,
       lineId,
       brand,
+      hasta,
     } = req.body;
 
     const inventory =
@@ -460,14 +461,29 @@ export const getValuedInventory = async (
         brand && brand !== "TODAS"
           ? brand
           : undefined,
+
+        hasta
+          ? new Date(
+              new Date(hasta).setHours(
+                23,
+                59,
+                59,
+                999,
+              ),
+            )
+          : undefined,
       );
 
     return res.json(inventory);
   } catch (error) {
-    console.error("ERROR INVENTARIO VALORADO:", error);
+    console.error(
+      "ERROR INVENTARIO VALORADO:",
+      error,
+    );
 
     return res.status(500).json({
-      message: "No se pudo generar el inventario valorado",
+      message:
+        "No se pudo generar el inventario valorado",
     });
   }
 };
