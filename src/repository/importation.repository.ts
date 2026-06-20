@@ -182,13 +182,16 @@ const recalculateGlobalPrice = async (
 
   const costWithIVA = newGlobalPrice * (1 + IVA);
 
-  const newFinalPrice = costWithIVA * (1 + product.porcentajeGanancia / 100);
-  
+  const newFinalPrice = round(
+    costWithIVA * (1 + product.porcentajeGanancia / 100),
+    CALC_DECIMALS,
+  );
+
   await tx.product.update({
     where: { id: productId },
     data: {
-      price: Number(newGlobalPrice.toFixed(2)),
-      finalPrice: Number(newFinalPrice.toFixed(2)),
+      price: newGlobalPrice,
+      finalPrice: newFinalPrice,
     },
   });
 };
