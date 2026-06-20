@@ -13,6 +13,7 @@ import {
   getPublicProductsRepo,
   getValuedInventoryRepo,
   updateMargenProductRepo,
+  createProductRepo,
 } from "../repository/product.repository";
 import jwt from "jsonwebtoken";
 
@@ -92,17 +93,15 @@ export const createProduct = async (req: Request, res: Response) => {
       // 🔥 CREAR PRODUCTO
       // =====================================================
 
-      const product = await tx.product.create({
-        data: {
-          name: name.trim().toUpperCase(),
-          description,
-          barcode: barcode.trim(),
-          imageUrl,
-          price: Number(price),
-          finalPrice: Number(finalPrice),
-          lineId: Number(lineId),
-          brandName: brandName.trim(),
-        },
+      const product = await createProductRepo({
+        name,
+        description,
+        barcode,
+        imageUrl,
+        price,
+        finalPrice,
+        lineId,
+        brandName,
       });
 
       console.log("✅ Producto creado:", product.id);
@@ -203,9 +202,7 @@ export const getPublicProducts = async (req: Request, res: Response) => {
     const token = req.headers["x-access-token"] as string;
     const user = jwt.verify(token, process.env.JWTSECRET!) as any;
 
-    const products = await getPublicProductsRepo(
-      Number(user.locationId),
-    );
+    const products = await getPublicProductsRepo(Number(user.locationId));
 
     return res.json(products);
   } catch {
@@ -401,90 +398,49 @@ export const crossInventory = async (req: Request, res: Response) => {
   }
 };
 
-export const getInventoryCrosses = async (
-  req: Request,
-  res: Response,
-) => {
+export const getInventoryCrosses = async (req: Request, res: Response) => {
   try {
     const token = req.headers["x-access-token"] as string;
 
-    const user = jwt.verify(
-      token,
-      process.env.JWTSECRET!,
-    ) as any;
+    const user = jwt.verify(token, process.env.JWTSECRET!) as any;
 
-    const isManagement =
-      user.level === 1 ||
-      user.level === 4;
+    const isManagement = user.level === 1 || user.level === 4;
 
-    const crosses =
-      await getInventoryCrossesRepo(
-        Number(user.locationId),
-        isManagement,
-      );
+    const crosses = await getInventoryCrossesRepo(
+      Number(user.locationId),
+      isManagement,
+    );
 
     return res.json(crosses);
   } catch (error) {
     return res.status(500).json({
-      message:
-        "No se pudieron obtener los cruces",
+      message: "No se pudieron obtener los cruces",
     });
   }
 };
 
-export const getValuedInventory = async (
-  req: Request,
-  res: Response,
-) => {
+export const getValuedInventory = async (req: Request, res: Response) => {
   try {
-    const {
-      locationId,
-      productId,
-      lineId,
-      brand,
-      hasta,
-    } = req.body;
+    const { locationId, productId, lineId, brand, hasta } = req.body;
 
-    const inventory =
-      await getValuedInventoryRepo(
-        locationId && Number(locationId) > 0
-          ? Number(locationId)
-          : undefined,
+    const inventory = await getValuedInventoryRepo(
+      locationId && Number(locationId) > 0 ? Number(locationId) : undefined,
 
-        productId && Number(productId) > 0
-          ? Number(productId)
-          : undefined,
+      productId && Number(productId) > 0 ? Number(productId) : undefined,
 
-        lineId && Number(lineId) > 0
-          ? Number(lineId)
-          : undefined,
+      lineId && Number(lineId) > 0 ? Number(lineId) : undefined,
 
-        brand && brand !== "TODAS"
-          ? brand
-          : undefined,
+      brand && brand !== "TODAS" ? brand : undefined,
 
-        hasta
-          ? new Date(
-              new Date(hasta).setHours(
-                23,
-                59,
-                59,
-                999,
-              ),
-            )
-          : undefined,
-      );
+      hasta ? new Date(new Date(hasta).setHours(23, 59, 59, 999)) : undefined,
+    );
 
     return res.json(inventory);
   } catch (error) {
-    console.error(
-      "ERROR INVENTARIO VALORADO:",
-      error,
-    );
+    console.error("ERROR INVENTARIO VALORADO:", error);
 
     return res.status(500).json({
-      message:
-        "No se pudo generar el inventario valorado",
+      message: "No se pudo generar el inventario valorado",
     });
   }
 };
