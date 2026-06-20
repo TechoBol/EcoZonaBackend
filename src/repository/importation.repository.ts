@@ -17,6 +17,15 @@ type CreateImportationDTO = {
   locationId: number;
 };
 
+// Redondeo seguro para evitar errores de precisión de punto flotante (IEEE 754)
+const round = (value: number, decimals: number): number => {
+  const factor = 10 ** decimals;
+  return Math.round((value + Number.EPSILON) * factor) / factor;
+};
+
+// Precisión interna de cálculo (NO usar para mostrar al usuario)
+const CALC_DECIMALS = 4;
+
 const upsertInventory = async (
   tx: Prisma.TransactionClient,
   productId: number,
@@ -36,7 +45,7 @@ const upsertInventory = async (
         productId,
         locationId,
         quantity,
-        averageCost: unitCost,
+        averageCost: round(unitCost, CALC_DECIMALS),
       },
     });
   } else {
@@ -44,7 +53,9 @@ const upsertInventory = async (
     const totalNuevo = quantity * unitCost;
     const nuevaCantidad = inventory.quantity + quantity;
     const nuevoPromedio =
-      nuevaCantidad > 0 ? (totalActual + totalNuevo) / nuevaCantidad : unitCost;
+      nuevaCantidad > 0
+        ? round((totalActual + totalNuevo) / nuevaCantidad, CALC_DECIMALS)
+        : round(unitCost, CALC_DECIMALS);
 
     await tx.inventory.update({
       where: {
@@ -158,11 +169,13 @@ const recalculateGlobalPrice = async (
 
   const newGlobalStock = currentGlobalStock + newQuantity;
 
-  const newGlobalPrice =
+  const newGlobalPrice = round(
     newGlobalStock > 0
       ? (currentGlobalStock * currentGlobalCost + newQuantity * newUnitCost) /
-        newGlobalStock
-      : newUnitCost;
+      newGlobalStock
+      : newUnitCost,
+    CALC_DECIMALS,
+  );
 
   await tx.product.update({
     where: { id: productId },
