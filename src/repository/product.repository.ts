@@ -1724,3 +1724,64 @@ export const getValuedInventoryRepo = async (
       a.descripcion.localeCompare(b.descripcion),
     );
 };
+export const updateMargenProductRepo = async (
+  id: number,
+  porcentajeGanancia: number,
+  quantityDiscount: number,
+  bossDiscount: number,
+) => {
+  return prisma.$transaction(async (tx) => {
+    //////////////////////////////////////////////////////
+    // PRODUCTO
+    //////////////////////////////////////////////////////
+    const product = await tx.product.findUnique({
+      where: { id },
+    });
+
+    if (!product) {
+      throw new Error("Producto no encontrado");
+    }
+
+    //////////////////////////////////////////////////////
+    // COSTO + IVA
+    //////////////////////////////////////////////////////
+    const cost = Number(product.price || 0);
+
+    const IVA = 1.1494;
+
+    const costIva = cost * IVA;
+
+    //////////////////////////////////////////////////////
+    // PRECIO EJECUTIVO
+    //////////////////////////////////////////////////////
+    const finalPrice = Number(
+      (
+        costIva *
+        (1 + Number(porcentajeGanancia || 0) / 100)
+      ).toFixed(2),
+    );
+
+    //////////////////////////////////////////////////////
+    // UPDATE
+    //////////////////////////////////////////////////////
+    const updatedProduct = await tx.product.update({
+      where: { id },
+      data: {
+        porcentajeGanancia: Number(porcentajeGanancia),
+        quantityDiscount: Number(quantityDiscount),
+        bossDiscount: Number(bossDiscount),
+        finalPrice,
+      },
+      include: {
+        line: true,
+        inventories: {
+          include: {
+            location: true,
+          },
+        },
+      },
+    });
+
+    return updatedProduct;
+  });
+};

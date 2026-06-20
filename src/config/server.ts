@@ -35,4 +35,5 @@ app.use("/api/line", verifyToken, lineRoute);
 app.use("/api/importation", verifyToken, importationRoute);
 app.use('/api/productDetail', verifyToken, productDetailRoute);
 
+
 export default app;

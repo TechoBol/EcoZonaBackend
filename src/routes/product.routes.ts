@@ -8,6 +8,7 @@ import {
   getProducts,
   getPublicProducts,
   getValuedInventory,
+  updateMargenProduct,
   updateProduct,
 } from "../controllers/product.controller";
 
@@ -22,5 +23,6 @@ router.post("/kardex-valorado", getValuedInventory);
 router.post("/kardex-pro", getKardexPro);
 router.post("/cross-inventory", crossInventory);
 router.get("/inventory-cross", getInventoryCrosses);
+router.put("/update-margen/:id", updateMargenProduct);
 
 export default router;

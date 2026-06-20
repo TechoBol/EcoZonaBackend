@@ -128,6 +128,7 @@ const processProducts = async (
     }),
   );
 };
+
 const recalculateGlobalPrice = async (
   tx: Prisma.TransactionClient,
   productId: number,
@@ -164,14 +165,21 @@ const recalculateGlobalPrice = async (
         newGlobalStock
       : newUnitCost;
 
+  const IVA = 0.1494;
+
+  const costWithIVA = newGlobalPrice * (1 + IVA);
+
+  const newFinalPrice = costWithIVA * (1 + product.porcentajeGanancia / 100);
+  
   await tx.product.update({
     where: { id: productId },
     data: {
       price: Number(newGlobalPrice.toFixed(2)),
+      finalPrice: Number(newFinalPrice.toFixed(2)),
     },
   });
 };
-// importation.repository.ts
+
 export const createImportationRepo = async ({
   code,
   type,
