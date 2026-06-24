@@ -104,7 +104,8 @@ model Product {
   id          Int     @id @default(autoincrement())
   name        String
   description String?
-  barcode     String  @unique
+  barcode     String? @unique
+  productCode String? @unique
   imageUrl    String?
   price       Float
   finalPrice  Float
@@ -121,8 +122,7 @@ model Product {
   transferItems    TransferItem[]
   importationItems ImportationItem[]
   crossesFrom      InventoryCross[]  @relation("CrossOriginProduct")
-
-  crossesTo InventoryCross[] @relation("CrossDestinationProduct")
+  crossesTo        InventoryCross[]  @relation("CrossDestinationProduct")
 
   porcentajeGanancia Float @default(0)
   quantityDiscount   Float @default(0)

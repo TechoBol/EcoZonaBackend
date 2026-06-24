@@ -3,7 +3,8 @@ import prisma from "../config/db";
 type CreateProductDTO = {
   name: string;
   description?: string;
-  barcode: string;
+  barcode?: string | null;
+  productCode?: string | null;
   imageUrl?: string;
   price: number;
   finalPrice: number;
@@ -134,7 +135,8 @@ export const updateProductRepo = async (id: number, data: any) => {
       data: {
         name: productData.name,
         description: productData.description,
-        barcode: productData.barcode,
+        barcode: productData.barcode?.trim() || null,
+        productCode: productData.productCode?.trim() || null,
         price: productData.price,
         finalPrice: productData.finalPrice,
         porcentajeGanancia,
@@ -1492,6 +1494,7 @@ export const getPublicProductsRepo = async (locationId: number) => {
       id: true,
       name: true,
       barcode: true,
+      productCode: true,
       imageUrl: true,
       finalPrice: true,
       brandName: true,
@@ -1522,6 +1525,7 @@ export const getPublicProductsRepo = async (locationId: number) => {
       id: product.id,
       name: product.name,
       barcode: product.barcode,
+      productCode: product.productCode,
       imageUrl: product.imageUrl,
       finalPrice: product.finalPrice,
       brandName: product.brandName,
