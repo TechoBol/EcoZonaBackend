@@ -3,7 +3,7 @@ import * as XLSX from "xlsx";
 import { Prisma } from "@prisma/client";
 
 type ImportationProduct = {
-  barcode: string;
+  productCode: string;
   quantity: number;
   unitCost: number;
 };
@@ -41,7 +41,9 @@ const round = (value: number, decimals: number): number => {
 
 const CALC_DECIMALS = 4;
 
-const parseProductsFromExcel = (file: Express.Multer.File): ImportationProduct[] => {
+const parseProductsFromExcel = (
+  file: Express.Multer.File,
+): ImportationProduct[] => {
   const workbook = XLSX.read(file.buffer, { type: "buffer" });
   const sheetName = workbook.SheetNames[0];
   const sheet = workbook.Sheets[sheetName];
@@ -50,15 +52,17 @@ const parseProductsFromExcel = (file: Express.Multer.File): ImportationProduct[]
   if (!rows.length) throw new Error("El archivo Excel está vacío");
 
   return rows.map((row) => {
-    const barcode = String(row.barcode || "").trim().replace(/\s+/g, "");
+    const productCode = String(row.productCode || "")
+      .trim()
+      .replace(/\s+/g, "");
     const quantity = Number(row.quantity || 0);
     const unitCost = Number(row.unitCost || 0);
 
-    if (!barcode) throw new Error("Barcode inválido en el archivo Excel");
-    if (quantity <= 0) throw new Error(`Cantidad inválida (${barcode})`);
-    if (unitCost < 0) throw new Error(`Costo inválido (${barcode})`);
+    if (!productCode) throw new Error("Codigo inválido en el archivo Excel");
+    if (quantity <= 0) throw new Error(`Cantidad inválida (${productCode})`);
+    if (unitCost < 0) throw new Error(`Costo inválido (${productCode})`);
 
-    return { barcode, quantity, unitCost };
+    return { productCode, quantity, unitCost };
   });
 };
 
@@ -125,7 +129,8 @@ const recalculateGlobalPrice = async (
 
   const newGlobalPrice = round(
     newGlobalStock > 0
-      ? (currentGlobalStock * currentGlobalCost + newQuantity * newUnitCost) / newGlobalStock
+      ? (currentGlobalStock * currentGlobalCost + newQuantity * newUnitCost) /
+          newGlobalStock
       : newUnitCost,
     CALC_DECIMALS,
   );
@@ -151,9 +156,9 @@ const processProducts = async (
   code: string,
 ) => {
   await Promise.all(
-    products.map(async ({ barcode, quantity, unitCost }) => {
-      const product = await tx.product.findUnique({ where: { barcode } });
-      if (!product) throw new Error(`PRODUCT_NOT_FOUND:${barcode}`);
+    products.map(async ({ productCode, quantity, unitCost }) => {
+      const product = await tx.product.findUnique({ where: { productCode } });
+      if (!product) throw new Error(`PRODUCT_NOT_FOUND:${productCode}`);
 
       await upsertInventory(tx, product.id, locationId, quantity, unitCost);
       await recalculateGlobalPrice(tx, product.id, quantity, unitCost);
@@ -222,9 +227,11 @@ export const createImportationRepo = async ({
     async (tx) => {
       // Verificar que todos los productos existen antes de guardar
       await Promise.all(
-        parsedProducts.map(async ({ barcode }) => {
-          const product = await tx.product.findUnique({ where: { barcode } });
-          if (!product) throw new Error(`PRODUCT_NOT_FOUND:${barcode}`);
+        parsedProducts.map(async ({ productCode }) => {
+          const product = await tx.product.findUnique({
+            where: { productCode },
+          });
+          if (!product) throw new Error(`PRODUCT_NOT_FOUND:${productCode}`);
         }),
       );
 
@@ -238,10 +245,14 @@ export const createImportationRepo = async ({
           locationId,
           items: {
             create: await Promise.all(
-              parsedProducts.map(async ({ barcode, quantity, unitCost }) => {
-                const product = await tx.product.findUnique({ where: { barcode } });
-                return { productId: product!.id, quantity, unitCost };
-              }),
+              parsedProducts.map(
+                async ({ productCode, quantity, unitCost }) => {
+                  const product = await tx.product.findUnique({
+                    where: { productCode },
+                  });
+                  return { productId: product!.id, quantity, unitCost };
+                },
+              ),
             ),
           },
         },
@@ -278,9 +289,11 @@ export const updateImportationRepo = async ({
     async (tx) => {
       // Verificar productos
       await Promise.all(
-        parsedProducts.map(async ({ barcode }) => {
-          const product = await tx.product.findUnique({ where: { barcode } });
-          if (!product) throw new Error(`PRODUCT_NOT_FOUND:${barcode}`);
+        parsedProducts.map(async ({ productCode }) => {
+          const product = await tx.product.findUnique({
+            where: { productCode },
+          });
+          if (!product) throw new Error(`PRODUCT_NOT_FOUND:${productCode}`);
         }),
       );
 
@@ -293,10 +306,14 @@ export const updateImportationRepo = async ({
           ...(file && type === "EXCEL" ? { fileName: file.originalname } : {}),
           items: {
             create: await Promise.all(
-              parsedProducts.map(async ({ barcode, quantity, unitCost }) => {
-                const product = await tx.product.findUnique({ where: { barcode } });
-                return { productId: product!.id, quantity, unitCost };
-              }),
+              parsedProducts.map(
+                async ({ productCode, quantity, unitCost }) => {
+                  const product = await tx.product.findUnique({
+                    where: { productCode },
+                  });
+                  return { productId: product!.id, quantity, unitCost };
+                },
+              ),
             ),
           },
         },
@@ -330,15 +347,27 @@ export const changeImportationStatusRepo = async ({
     async (tx) => {
       if (status === "APPROVED") {
         // Aplicar inventario y movimientos
-        const products: ImportationProduct[] = importation.items.map((item) => ({
-          barcode: item.product.barcode,
-          quantity: item.quantity,
-          unitCost: item.unitCost,
-        }));
+        const products: ImportationProduct[] = importation.items.map((item) => {
+          if (!item.product.productCode) {
+            throw new Error(`PRODUCT_WITHOUT_CODE:${item.product.id}`);
+          }
+
+          return {
+            productCode: item.product.productCode,
+            quantity: item.quantity,
+            unitCost: item.unitCost,
+          };
+        });
 
         console.log("IMPORTATION LOCATION:", importation.locationId);
         console.log("IMPORTATION CODE:", importation.code);
-        await processProducts(tx, products, id, importation.locationId, importation.code);
+        await processProducts(
+          tx,
+          products,
+          id,
+          importation.locationId,
+          importation.code,
+        );
       }
 
       const updated = await tx.importation.update({
@@ -382,7 +411,7 @@ export const getImportationByIdRepo = async (id: number) => {
       items: {
         include: {
           product: {
-            select: { id: true, name: true, barcode: true },
+            select: { id: true, name: true, productCode: true },
           },
         },
       },
