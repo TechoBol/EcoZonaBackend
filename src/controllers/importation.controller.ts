@@ -66,8 +66,8 @@ export const createImportation = async ( req: Request, res: Response ) => {
     }
 
     if (error.message?.includes("PRODUCT_NOT_FOUND")) {
-      const barcode = error.message.split(":")[1];
-      return res.status(400).json({ message: `Producto no encontrado (${barcode})` });
+      const productCode = error.message.split(":")[1];
+      return res.status(400).json({ message: `Producto no encontrado (${productCode})` });
     }
 
     return res.status(500).json({ message: error.message || "No se pudo crear la importación" });
@@ -124,8 +124,8 @@ export const updateImportation = async (req: Request, res: Response) => {
     }
 
     if (error.message?.includes("PRODUCT_NOT_FOUND")) {
-      const barcode = error.message.split(":")[1];
-      return res.status(400).json({ message: `Producto no encontrado (${barcode})` });
+      const productCode = error.message.split(":")[1];
+      return res.status(400).json({ message: `Producto no encontrado (${productCode})` });
     }
 
     return res.status(500).json({ message: error.message || "No se pudo actualizar la importación" });
@@ -173,8 +173,8 @@ export const changeImportationStatus = async (req: Request, res: Response) => {
     }
 
     if (error.message?.includes("PRODUCT_NOT_FOUND")) {
-      const barcode = error.message.split(":")[1];
-      return res.status(400).json({ message: `Producto no encontrado (${barcode})` });
+      const productCode = error.message.split(":")[1];
+      return res.status(400).json({ message: `Producto no encontrado (${productCode})` });
     }
 
     return res.status(500).json({ message: error.message || "No se pudo cambiar el estado" });

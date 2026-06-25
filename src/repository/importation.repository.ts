@@ -119,7 +119,7 @@ const recalculateGlobalPrice = async (
     where: { productId, quantity: { gt: 0 } },
   });
 
-  const product = await tx.product.findUnique({ where: { id: productId } });
+  const product = await tx.product.findFirst({ where: { id: productId } });
   if (!product) throw new Error("Producto no encontrado");
 
   const currentGlobalStock =
@@ -157,7 +157,7 @@ const processProducts = async (
 ) => {
   await Promise.all(
     products.map(async ({ productCode, quantity, unitCost }) => {
-      const product = await tx.product.findUnique({ where: { productCode } });
+      const product = await tx.product.findFirst({ where: { productCode } });
       if (!product) throw new Error(`PRODUCT_NOT_FOUND:${productCode}`);
 
       await upsertInventory(tx, product.id, locationId, quantity, unitCost);
@@ -228,7 +228,7 @@ export const createImportationRepo = async ({
       // Verificar que todos los productos existen antes de guardar
       await Promise.all(
         parsedProducts.map(async ({ productCode }) => {
-          const product = await tx.product.findUnique({
+          const product = await tx.product.findFirst({
             where: { productCode },
           });
           if (!product) throw new Error(`PRODUCT_NOT_FOUND:${productCode}`);
@@ -247,7 +247,7 @@ export const createImportationRepo = async ({
             create: await Promise.all(
               parsedProducts.map(
                 async ({ productCode, quantity, unitCost }) => {
-                  const product = await tx.product.findUnique({
+                  const product = await tx.product.findFirst({
                     where: { productCode },
                   });
                   return { productId: product!.id, quantity, unitCost };
@@ -275,7 +275,7 @@ export const updateImportationRepo = async ({
   file,
   type,
 }: UpdateImportationDTO) => {
-  const importation = await prisma.importation.findUnique({ where: { id } });
+  const importation = await prisma.importation.findFirst({ where: { id } });
 
   if (!importation) throw new Error("Importación no encontrada");
   if (importation.status !== "DRAFT") throw new Error("INVALID_STATUS");
@@ -290,7 +290,7 @@ export const updateImportationRepo = async ({
       // Verificar productos
       await Promise.all(
         parsedProducts.map(async ({ productCode }) => {
-          const product = await tx.product.findUnique({
+          const product = await tx.product.findFirst({
             where: { productCode },
           });
           if (!product) throw new Error(`PRODUCT_NOT_FOUND:${productCode}`);
@@ -308,7 +308,7 @@ export const updateImportationRepo = async ({
             create: await Promise.all(
               parsedProducts.map(
                 async ({ productCode, quantity, unitCost }) => {
-                  const product = await tx.product.findUnique({
+                  const product = await tx.product.findFirst({
                     where: { productCode },
                   });
                   return { productId: product!.id, quantity, unitCost };
@@ -335,7 +335,7 @@ export const changeImportationStatusRepo = async ({
   status,
   resolvedById,
 }: ChangeStatusDTO) => {
-  const importation = await prisma.importation.findUnique({
+  const importation = await prisma.importation.findFirst({
     where: { id },
     include: { items: { include: { product: true } } },
   });
@@ -398,7 +398,7 @@ export const getImportationsRepo = async () => {
 };
 
 export const getImportationByIdRepo = async (id: number) => {
-  return prisma.importation.findUnique({
+  return prisma.importation.findFirst({
     where: { id },
     include: {
       employee: {
