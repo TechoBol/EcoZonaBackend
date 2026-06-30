@@ -13,7 +13,7 @@ import {
   getPublicProductsRepo,
   getValuedInventoryRepo,
   updateMargenProductRepo,
-  createProductRepo,
+  //createProductRepo,
 } from "../repository/product.repository";
 import jwt from "jsonwebtoken";
 
@@ -23,6 +23,7 @@ export const createProduct = async (req: Request, res: Response) => {
       name,
       description,
       barcode,
+      productCode,
       imageUrl,
       price,
       finalPrice,
@@ -40,7 +41,6 @@ export const createProduct = async (req: Request, res: Response) => {
 
     if (
       !name ||
-      !barcode ||
       price == null ||
       finalPrice == null ||
       locationId == null ||
@@ -93,15 +93,18 @@ export const createProduct = async (req: Request, res: Response) => {
       // 🔥 CREAR PRODUCTO
       // =====================================================
 
-      const product = await createProductRepo({
-        name,
-        description,
-        barcode,
-        imageUrl,
-        price,
-        finalPrice,
-        lineId,
-        brandName,
+      const product = await tx.product.create({
+        data: {
+          name: name.trim().toUpperCase(),
+          description,
+          barcode: barcode?.trim() || productCode?.trim() || null,
+          productCode: productCode?.trim() || null,
+          imageUrl,
+          price: Number(price),
+          finalPrice: Number(finalPrice),
+          lineId: Number(lineId),
+          brandName: brandName.trim(),
+        },
       });
 
       console.log("✅ Producto creado:", product.id);
@@ -237,6 +240,7 @@ export const updateProduct = async (req: Request, res: Response) => {
       name,
       description,
       barcode,
+      productCode,
       imageUrl,
       price,
       finalPrice,
@@ -250,7 +254,7 @@ export const updateProduct = async (req: Request, res: Response) => {
     // ==========================================
     // 🔎 VALIDACIONES
     // ==========================================
-    if (!name || !barcode || !lineId || !brandName) {
+    if (!name || !lineId || !brandName) {
       return res.status(400).json({
         message: "Campos incompletos",
       });
@@ -286,7 +290,8 @@ export const updateProduct = async (req: Request, res: Response) => {
     const updated = await updateProductRepo(id, {
       name,
       description,
-      barcode,
+      barcode: barcode?.trim() || productCode?.trim() || null,
+      productCode,
       imageUrl,
       price: Number(price),
       finalPrice: Number(finalPrice),

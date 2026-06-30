@@ -67,9 +67,10 @@ model Employee {
   requestedTransfers Transfer[] @relation("RequestedBy")
   approvedTransfers  Transfer[] @relation("ApprovedBy")
 
-  importations        Importation[]
-  PublicInventoryLink PublicInventoryLink[]
-  InventoryCross      InventoryCross[]
+  createdImportations  Importation[]         @relation("ImportationCreatedBy")
+  resolvedImportations Importation[]         @relation("ImportationResolvedBy")
+  PublicInventoryLink  PublicInventoryLink[]
+  InventoryCross       InventoryCross[]
 }
 
 model Role {
@@ -104,7 +105,8 @@ model Product {
   id          Int     @id @default(autoincrement())
   name        String
   description String?
-  barcode     String  @unique
+  barcode     String? @unique
+  productCode String? @unique
   imageUrl    String?
   price       Float
   finalPrice  Float
@@ -121,8 +123,7 @@ model Product {
   transferItems    TransferItem[]
   importationItems ImportationItem[]
   crossesFrom      InventoryCross[]  @relation("CrossOriginProduct")
-
-  crossesTo InventoryCross[] @relation("CrossDestinationProduct")
+  crossesTo        InventoryCross[]  @relation("CrossDestinationProduct")
 
   porcentajeGanancia Float @default(0)
   quantityDiscount   Float @default(0)
@@ -156,9 +157,14 @@ enum ImportationType {
   EXCEL
 }
 
-model Importation {
-  id Int @id @default(autoincrement())
+enum ImportationStatus {
+  DRAFT
+  APPROVED
+  CANCELLED
+}
 
+model Importation {
+  id   Int    @id @default(autoincrement())
   code String
 
   type ImportationType @default(EXCEL)
@@ -166,10 +172,19 @@ model Importation {
   fileName String?
   fileUrl  String?
 
-  createdAt DateTime @default(now())
+  status ImportationStatus @default(DRAFT)
 
-  employee   Employee @relation(fields: [employeeId], references: [id])
+  createdAt DateTime  @default(now())
+  updatedAt DateTime? @updatedAt
+
+  // Quien creó la importación
+  employee   Employee @relation("ImportationCreatedBy", fields: [employeeId], references: [id])
   employeeId Int
+
+  // Quien aprobó o canceló
+  resolvedBy   Employee? @relation("ImportationResolvedBy", fields: [resolvedById], references: [id])
+  resolvedById Int?
+  resolvedAt   DateTime?
 
   location   Location @relation(fields: [locationId], references: [id])
   locationId Int

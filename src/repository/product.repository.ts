@@ -3,7 +3,8 @@ import prisma from "../config/db";
 type CreateProductDTO = {
   name: string;
   description?: string;
-  barcode: string;
+  barcode?: string | null;
+  productCode?: string | null;
   imageUrl?: string;
   price: number;
   finalPrice: number;
@@ -134,7 +135,8 @@ export const updateProductRepo = async (id: number, data: any) => {
       data: {
         name: productData.name,
         description: productData.description,
-        barcode: productData.barcode,
+        barcode: productData.barcode?.trim() || null,
+        productCode: productData.productCode?.trim() || null,
         price: productData.price,
         finalPrice: productData.finalPrice,
         porcentajeGanancia,
@@ -255,12 +257,7 @@ export const getKardexRepo = async ({
   linea?: number;
   marca?: string;
 }) => {
-  console.log("📥 INPUT:", {
-    productId,
-    fromDate,
-    toDate,
-    locationId,
-  });
+  console.log("📥 INPUT:", { productId, fromDate, toDate, locationId });
 
   ////////////////////////////////////////////////////////////
   // 🔥 FECHAS
@@ -268,9 +265,7 @@ export const getKardexRepo = async ({
 
   const parseDate = (dateStr?: string, end = false) => {
     if (!dateStr) return null;
-
     const d = new Date(end ? `${dateStr}T23:59:59` : `${dateStr}T00:00:00`);
-
     return isNaN(d.getTime()) ? null : d;
   };
 
@@ -284,75 +279,58 @@ export const getKardexRepo = async ({
   const products = await prisma.product.findMany({
     where: {
       isVisible: true,
-
-      ...(productId && {
-        id: productId,
-      }),
-
-      ...(linea && {
-        lineId: linea,
-      }),
-
+      ...(productId && { id: productId }),
+      ...(linea && { lineId: linea }),
       ...(marca &&
         marca.trim() !== "" && {
-          brandName: {
-            contains: marca,
-            mode: "insensitive",
-          },
+          brandName: { contains: marca, mode: "insensitive" },
         }),
     },
-
-    include: {
-      line: true,
-    },
+    include: { line: true },
   });
 
   ////////////////////////////////////////////////////////////
-  // 🔥 MOVIMIENTOS
+  // 🔥 MOVIMIENTOS DEL RANGO
   ////////////////////////////////////////////////////////////
 
   const movements = await prisma.stockMovement.findMany({
     where: {
-      ...(productId && {
-        productId,
-      }),
-
+      ...(productId && { productId }),
       ...(locationId && {
-        OR: [
-          {
-            fromLocationId: locationId,
-          },
-          {
-            toLocationId: locationId,
-          },
-        ],
+        OR: [{ fromLocationId: locationId }, { toLocationId: locationId }],
       }),
-
-      ...(from &&
-        to && {
-          createdAt: {
-            gte: from,
-            lte: to,
-          },
-        }),
+      ...(from && to && { createdAt: { gte: from, lte: to } }),
     },
-
     include: {
-      product: {
-        include: {
-          line: true,
-        },
-      },
-
+      product: { include: { line: true } },
       transfer: true,
       fromLocation: true,
       toLocation: true,
     },
-
-    orderBy: {
-      createdAt: "asc",
-    },
+    orderBy: { createdAt: "asc" },
   });
+
+  ////////////////////////////////////////////////////////////
+  // 🔥 MOVIMIENTOS ANTERIORES AL RANGO (para saldo inicial)
+  ////////////////////////////////////////////////////////////
+
+  const movimientosAnteriores = from
+    ? await prisma.stockMovement.findMany({
+        where: {
+          ...(productId && { productId }),
+          ...(locationId && {
+            OR: [{ fromLocationId: locationId }, { toLocationId: locationId }],
+          }),
+          createdAt: { lt: from },
+        },
+        include: {
+          transfer: true,
+          fromLocation: true,
+          toLocation: true,
+        },
+        orderBy: { createdAt: "asc" },
+      })
+    : [];
 
   const resultado: any[] = [];
 
@@ -368,10 +346,7 @@ export const getKardexRepo = async ({
     const inventory = await prisma.inventory.findMany({
       where: {
         productId: product.id,
-
-        ...(locationId && {
-          locationId,
-        }),
+        ...(locationId && { locationId }),
       },
     });
 
@@ -384,7 +359,53 @@ export const getKardexRepo = async ({
         : product.price;
 
     //////////////////////////////////////////////////////////
-    // 🔥 MOVIMIENTOS PRODUCTO
+    // 🔥 CALCULAR SALDO INICIAL (movimientos ANTES del rango)
+    //////////////////////////////////////////////////////////
+
+    let saldoCantidad = 0;
+    let saldoTotal = 0;
+    let costoPromedio = 0;
+
+    if (from) {
+      const movsPrevios = movimientosAnteriores.filter(
+        (m) => m.productId === product.id,
+      );
+
+      for (const mov of movsPrevios) {
+        let entrada = 0;
+        let salida = 0;
+        let costo = Number(mov.unitCost || 0);
+
+        if (mov.type === "IN") {
+          entrada = mov.quantity;
+        } else if (mov.type === "OUT") {
+          salida = mov.quantity;
+        } else if (mov.type === "TRANSFER") {
+          if (locationId) {
+            if (mov.toLocationId === locationId) entrada = mov.quantity;
+            if (mov.fromLocationId === locationId) salida = mov.quantity;
+          }
+          // Global: transferencias se anulan entre sí, no afectan stock total
+        }
+
+        if (entrada > 0) {
+          if (costo <= 0) costo = costoPromedio;
+          saldoTotal += entrada * costo;
+          saldoCantidad += entrada;
+          costoPromedio =
+            saldoCantidad > 0 ? saldoTotal / saldoCantidad : costo;
+        }
+
+        if (salida > 0) {
+          const salidaTotal = salida * costoPromedio;
+          saldoCantidad -= salida;
+          saldoTotal -= salidaTotal;
+        }
+      }
+    }
+
+    //////////////////////////////////////////////////////////
+    // 🔥 MOVIMIENTOS DEL PRODUCTO EN EL RANGO
     //////////////////////////////////////////////////////////
 
     const movimientosProducto: any[] = [];
@@ -392,129 +413,62 @@ export const getKardexRepo = async ({
     for (const mov of movements.filter((m) => m.productId === product.id)) {
       let entrada = 0;
       let salida = 0;
-
       let detalle = "";
-
       let codigoMovimiento = "";
-
-      ////////////////////////////////////////////////////////
-      // 🔥 INGRESOS
-      ////////////////////////////////////////////////////////
 
       if (mov.type === "IN") {
         entrada = mov.quantity;
-
         detalle = (mov.reference || "COMPRA / IMPORTACIÓN").toUpperCase();
       }
 
-      ////////////////////////////////////////////////////////
-      // 🔥 SALIDAS
-      ////////////////////////////////////////////////////////
-
       if (mov.type === "OUT") {
         salida = mov.quantity;
-
         detalle = (mov.reference || "SALIDA").toUpperCase();
       }
 
-      ////////////////////////////////////////////////////////
-      // 🔥 TRANSFERENCIAS
-      ////////////////////////////////////////////////////////
-
       if (mov.type === "TRANSFER") {
         const transferCode = mov.transfer?.transferCode || `TR-${mov.id}`;
-
         const fromName = mov.fromLocation?.name?.toUpperCase() || "ORIGEN";
-
         const toName = mov.toLocation?.name?.toUpperCase() || "DESTINO";
 
         codigoMovimiento = transferCode;
 
-        //////////////////////////////////////////////////////
-        // 🔥 FILTRANDO POR SUCURSAL
-        //////////////////////////////////////////////////////
-
         if (locationId) {
-          //////////////////////////////////////////////////
-          // 🔥 ENTRADA
-          //////////////////////////////////////////////////
-
           if (mov.toLocationId === locationId) {
             entrada = mov.quantity;
-
-            detalle = (
-              `TRANSFERENCIA ENTRADA ${transferCode} ` +
-              `${fromName} → ${toName}`
-            ).toUpperCase();
+            detalle = `TRANSFERENCIA ENTRADA ${transferCode} ${fromName} → ${toName}`;
           }
-
-          //////////////////////////////////////////////////
-          // 🔥 SALIDA
-          //////////////////////////////////////////////////
-
           if (mov.fromLocationId === locationId) {
             salida = mov.quantity;
-
-            detalle = (
-              `TRANSFERENCIA SALIDA ${transferCode} ` +
-              `${fromName} → ${toName}`
-            ).toUpperCase();
+            detalle = `TRANSFERENCIA SALIDA ${transferCode} ${fromName} → ${toName}`;
           }
         } else {
-          //////////////////////////////////////////////////
-          // 🔥 GLOBAL
-          //////////////////////////////////////////////////
-
           movimientosProducto.push({
             fecha: mov.createdAt,
-
             codigoMovimiento: transferCode,
-
-            detalle: (
-              `TRANSFERENCIA SALIDA ${transferCode} ` +
-              `${fromName} → ${toName}`
-            ).toUpperCase(),
-
+            detalle: `TRANSFERENCIA SALIDA ${transferCode} ${fromName} → ${toName}`.toUpperCase(),
             entrada: 0,
             salida: mov.quantity,
-
             costoUnitario: mov.unitCost || 0,
           });
-
           movimientosProducto.push({
             fecha: mov.createdAt,
-
             codigoMovimiento: transferCode,
-
-            detalle: (
-              `TRANSFERENCIA ENTRADA ${transferCode} ` +
-              `${fromName} → ${toName}`
-            ).toUpperCase(),
-
+            detalle: `TRANSFERENCIA ENTRADA ${transferCode} ${fromName} → ${toName}`.toUpperCase(),
             entrada: mov.quantity,
             salida: 0,
-
             costoUnitario: mov.unitCost || 0,
           });
-
           continue;
         }
       }
 
-      ////////////////////////////////////////////////////////
-      // 🔥 AGREGAR MOVIMIENTO
-      ////////////////////////////////////////////////////////
-
       movimientosProducto.push({
         fecha: mov.createdAt,
-
         codigoMovimiento,
-
         detalle: detalle.toUpperCase(),
-
         entrada,
         salida,
-
         costoUnitario: mov.unitCost || 0,
       });
     }
@@ -528,39 +482,34 @@ export const getKardexRepo = async ({
     );
 
     //////////////////////////////////////////////////////////
-    // 🔥 SIN MOVIMIENTOS
+    // 🔥 SIN MOVIMIENTOS EN EL RANGO
     //////////////////////////////////////////////////////////
 
     if (movimientosProducto.length === 0) {
+      // Si hay filtro de fecha y saldo inicial es 0, no mostrar el producto
+      if (from && saldoCantidad <= 0) continue;
+
+      const costoMostrar = costoPromedio || inventoryCost;
+
       resultado.push({
         producto: product.name,
-
         barcode: product.barcode,
-
         linea: product.line?.name || "-",
-
         marca: product.brandName || "-",
-
         kardex: [
           {
-            fecha: new Date(),
-
+            fecha: from ?? new Date(),
             codigoMovimiento: "",
-
-            detalle: "SIN MOVIMIENTOS",
-
+            detalle: from ? "SALDO INICIAL" : "SIN MOVIMIENTOS",
             entrada: 0,
             salida: 0,
-
-            saldoCantidad: stockActual,
-
-            costoUnitario: inventoryCost,
-
+            saldoCantidad: from ? saldoCantidad : stockActual,
+            costoUnitario: costoMostrar,
             entradaTotal: 0,
-
             salidaTotal: 0,
-
-            saldoTotal: stockActual * inventoryCost,
+            saldoTotal: from
+              ? saldoTotal || saldoCantidad * costoMostrar
+              : stockActual * inventoryCost,
           },
         ],
       });
@@ -572,103 +521,77 @@ export const getKardexRepo = async ({
     // 🔥 KARDEX
     //////////////////////////////////////////////////////////
 
-    let saldoCantidad = 0;
-
-    let saldoTotal = 0;
-
-    let costoPromedio = 0;
-
     const kardexProducto: any[] = [];
 
-    for (const mov of movimientosProducto) {
-      ////////////////////////////////////////////////////////
-      // 🔥 COSTO REAL DEL MOVIMIENTO
-      ////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////
+    // 🔥 FILA DE SALDO INICIAL (solo si hay filtro de fecha y saldo > 0)
+    ////////////////////////////////////////////////////////
 
+    if (from && saldoCantidad > 0) {
+      const costoInicialMostrar = costoPromedio || inventoryCost;
+
+      kardexProducto.push({
+        fecha: from,
+        codigoMovimiento: "",
+        detalle: "SALDO INICIAL",
+        entrada: 0,
+        salida: 0,
+        saldoCantidad,
+        costoUnitario: costoInicialMostrar,
+        entradaTotal: 0,
+        salidaTotal: 0,
+        saldoTotal: saldoTotal || saldoCantidad * costoInicialMostrar,
+      });
+    }
+
+    ////////////////////////////////////////////////////////
+    // 🔥 MOVIMIENTOS DEL PERÍODO
+    ////////////////////////////////////////////////////////
+
+    for (const mov of movimientosProducto) {
       let costoMovimiento = Number(mov.costoUnitario || 0);
 
-      ////////////////////////////////////////////////////////
-      // 🔥 SI ENTRA CON COSTO 0
-      // USAR COSTO PROMEDIO ACTUAL
-      ////////////////////////////////////////////////////////
-
       if (mov.entrada > 0 && costoMovimiento <= 0) {
-        costoMovimiento = costoPromedio;
+        costoMovimiento = costoPromedio || inventoryCost;
       }
-
-      ////////////////////////////////////////////////////////
-      // 🔥 TOTAL ENTRADA
-      ////////////////////////////////////////////////////////
 
       const entradaTotal = mov.entrada * costoMovimiento;
 
-      ////////////////////////////////////////////////////////
-      // 🔥 ENTRADAS
-      ////////////////////////////////////////////////////////
-
       if (mov.entrada > 0) {
         saldoTotal += entradaTotal;
-
         saldoCantidad += mov.entrada;
-
         costoPromedio =
           saldoCantidad > 0 ? saldoTotal / saldoCantidad : costoMovimiento;
       }
-
-      ////////////////////////////////////////////////////////
-      // 🔥 SALIDAS
-      ////////////////////////////////////////////////////////
 
       let salidaTotal = 0;
 
       if (mov.salida > 0) {
         salidaTotal = mov.salida * costoPromedio;
-
         saldoCantidad -= mov.salida;
-
         saldoTotal -= salidaTotal;
       }
 
-      ////////////////////////////////////////////////////////
-      // 🔥 REGISTRO KARDEX
-      ////////////////////////////////////////////////////////
-
       kardexProducto.push({
         fecha: mov.fecha,
-
         codigoMovimiento: mov.codigoMovimiento || "",
-
         detalle: mov.detalle,
-
         entrada: mov.entrada,
-
         salida: mov.salida,
-
         saldoCantidad,
-
-        costoUnitario: mov.entrada > 0 ? costoMovimiento : costoPromedio,
-
+        costoUnitario:
+          mov.entrada > 0 ? costoMovimiento : costoPromedio || inventoryCost,
         entradaTotal,
-
         salidaTotal,
-
         saldoTotal,
       });
     }
 
-    //////////////////////////////////////////////////////////
-    // 🔥 RESULTADO PRODUCTO
-    //////////////////////////////////////////////////////////
-
     resultado.push({
       producto: product.name,
-
       barcode: product.barcode,
-
       linea: product.line?.name || "-",
-
       marca: product.brandName || "-",
-
       kardex: kardexProducto,
     });
   }
@@ -1492,6 +1415,7 @@ export const getPublicProductsRepo = async (locationId: number) => {
       id: true,
       name: true,
       barcode: true,
+      productCode: true,
       imageUrl: true,
       finalPrice: true,
       brandName: true,
@@ -1522,6 +1446,7 @@ export const getPublicProductsRepo = async (locationId: number) => {
       id: product.id,
       name: product.name,
       barcode: product.barcode,
+      productCode: product.productCode,
       imageUrl: product.imageUrl,
       finalPrice: product.finalPrice,
       brandName: product.brandName,
@@ -1676,10 +1601,7 @@ export const getValuedInventoryRepo = async (
     });
 
     inventoryCostMap = new Map(
-      inventories.map((i) => [
-        i.productId,
-        Number(i.averageCost),
-      ]),
+      inventories.map((i) => [i.productId, Number(i.averageCost)]),
     );
   }
 
@@ -1720,9 +1642,7 @@ export const getValuedInventoryRepo = async (
         valor: Number(item.cantidad * costoUnitario),
       };
     })
-    .sort((a, b) =>
-      a.descripcion.localeCompare(b.descripcion),
-    );
+    .sort((a, b) => a.descripcion.localeCompare(b.descripcion));
 };
 export const updateMargenProductRepo = async (
   id: number,
@@ -1755,10 +1675,7 @@ export const updateMargenProductRepo = async (
     // PRECIO EJECUTIVO
     //////////////////////////////////////////////////////
     const finalPrice = Number(
-      (
-        costIva *
-        (1 + Number(porcentajeGanancia || 0) / 100)
-      ).toFixed(2),
+      (costIva * (1 + Number(porcentajeGanancia || 0) / 100)).toFixed(2),
     );
 
     //////////////////////////////////////////////////////
